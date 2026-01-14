@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import XTree from "@/components/xtree";
 import MAGUS from "@/components/magus";
+import Citations from "@/components/citations";
 
 
 export default function BioinformaticsTools() {
@@ -105,45 +106,7 @@ export default function BioinformaticsTools() {
 
 
         {/* Citation Section */}
-        <section className="rounded-lg border border-secondary/20 p-6 space-y-6">
-          <h2 className="text-lg font-medium">Citation</h2>
-
-          <p className="text-sm text-secondary mx-auto">
-            If results generated through this interface contribute to a
-            publication, please cite the original tools listed below.
-            Proper attribution ensures continued support for open academic
-            bioinformatics software.
-          </p>
-
-          <div className="space-y-4 font-mono text-sm">
-            <div className="rounded border border-secondary/20 bg-(--color-codeBg) p-4">
-              <p className="mb-2 text-secondary">
-                XTree citation:
-              </p>
-              <pre className="whitespace-pre-wrap text-(--color-codeText)">
-Al-Ghalith GA, Ryon KA, Henriksen JR, Danko DC, Farthing B, Marengo M,
-Church GM, Peixoto RS, Patel CJ, Knights D, Tierney BT.
-XTree enables memory-efficient, accurate short and long sequence alignment
-to millions of genomes across the tree of life.
-bioRxiv (2025). https://doi.org/10.64898/2025.12.22.696015
-              </pre>
-            </div>
-
-            <div className="rounded border border-secondary/20 bg-(--color-codeBg) p-4">
-              <p className="mb-2 text-secondary">
-                MAGUS citation:
-              </p>
-              <pre className="whitespace-pre-wrap text-(--color-codeText)">
-Al-Ghalith GA, Ryon KA, Santoro E, Barno A, Casartelli M, Villela H,
-Diana SC, Henriksen JR, Carpenter GE, Quatrini P, Milazzo M,
-Patel CJ, Peixoto R, Tierney BT.
-Modular metagenomic analysis of pan-domain symbioses with MAGUS.
-bioRxiv (2025). https://doi.org/10.64898/2025.12.22.696022
-              </pre>
-            </div>
-          </div>
-        </section>
-
+        <Citations />
 
       </div>
     </div>

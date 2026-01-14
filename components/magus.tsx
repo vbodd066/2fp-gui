@@ -6,6 +6,7 @@ export default function MAGUS() {
   const [file, setFile] = useState<File | null>(null);
   const [preset, setPreset] = useState<"eukaryote" | "balanced">("eukaryote");
   const [minContig, setMinContig] = useState<number>(1000);
+  const [email, setEmail] = useState<string>("");
 
   const [status, setStatus] = useState<"idle" | "running" | "error" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export default function MAGUS() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("email", email);
     formData.append(
       "params",
       JSON.stringify({ preset, minContig })
@@ -49,7 +51,7 @@ export default function MAGUS() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-8 w-full">
       <div className="flex justify-between border-b border-secondary/20 pb-3">
         <h3 className="text-lg font-semibold">MAGUS Metagenomic Workflow</h3>
         <div className="flex gap-4 text-sm">
@@ -201,13 +203,28 @@ export default function MAGUS() {
         </label>
       </div>
 
+
+      <div className="space-y-2">
+          <label className="font-bold">*Email address:</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border p-1 bg-transparent"
+          />
+          <p className="text-sm text-secondary">
+            Provide an email address to receive the results and a notification when your MAGUS job is complete.
+          </p>
+      </div>
+
       <button
         onClick={runMAGUS}
-        disabled={!file || status === "running"}
-        className="bg-accent/80 px-4 py-2 text-black"
+        disabled={!file || !email || status === "running"}
+        className="bg-accent/80 px-4 py-2 text-black disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {status === "running" ? "Running…" : "Run MAGUS"}
+        {status === "running" ? "Running…" : "Submit MAGUS Job"}
       </button>
+
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
       {result && <pre className="text-xs bg-(--color-codeBg) p-4">{result}</pre>}

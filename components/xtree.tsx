@@ -11,6 +11,7 @@ export default function XTree() {
   const [status, setStatus] = useState<"idle" | "running" | "error" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [email, setEmail] = useState<string>("");
 
   async function runXTree() {
     if (!file) return;
@@ -21,6 +22,7 @@ export default function XTree() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("email", email);
     formData.append(
       "params",
       JSON.stringify({ db, readType, sensitivity })
@@ -50,7 +52,7 @@ export default function XTree() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-8 w-full">
       <div className="flex justify-between border-b border-secondary/20 pb-3">
         <h3 className="text-lg font-semibold">XTree Alignment</h3>
         <div className="flex gap-4 text-sm">
@@ -221,8 +223,24 @@ export default function XTree() {
         </label>
       </div>
 
-      <button onClick={runXTree} disabled={!file || status === "running"} className="bg-accent/80 px-4 py-2 text-black">
-        {status === "running" ? "Running…" : "Run XTree"}
+      <div className="space-y-2">
+          <label className="font-bold">*Email address:</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border p-1 bg-transparent"
+          />
+          <p className="text-sm text-secondary">
+            Provide an email address to receive the results and a notification when your XTree job is complete.
+          </p>
+      </div>
+
+      <button onClick={runXTree}
+      disabled={!file || !email || status === "running"}
+      className="bg-accent/80 px-4 py-2 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {status === "running" ? "Running…" : "Submit XTree Job"}
       </button>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
