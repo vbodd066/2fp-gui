@@ -17,6 +17,9 @@ scripts/xtree/2FP-XTree/
 # testing
 /coverage
 
+# Temp files while scripts are running
+tmp/
+
 # next.js
 /.next/
 /out/
