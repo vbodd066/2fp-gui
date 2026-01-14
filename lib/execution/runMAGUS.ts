@@ -1,48 +1,27 @@
 import { spawn } from "child_process";
 import path from "path";
-import { MAGUS_TIMEOUT } from "@/lib/uploads/limits";
 
-export function runMAGUS(inputPath: string): Promise<string> {
+export function runMAGUS(
+  inputPath: string,
+  params: { preset: string; minContig: number }
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    const magusPath = path.join(
-      process.cwd(),
-      "scripts",
-      "magus",
-      "2FP_MAGUS",
-      "magus.sh" // or main executable
-    );
+    const magus = path.join(process.cwd(), "scripts/magus/2FP_MAGUS/magus");
 
-    const proc = spawn(magusPath, [
-      "--input",
-      inputPath,
-      "--preset",
-      "eukaryote-dominant",
-    ]);
+    const args = [
+      "--input", inputPath,
+      "--preset", params.preset,
+      "--min-contig", String(params.minContig),
+    ];
 
-    let stdout = "";
-    let stderr = "";
+    const proc = spawn(magus, args);
+    let out = "", err = "";
 
-    const timeout = setTimeout(() => {
-      proc.kill("SIGKILL");
-      reject(new Error("MAGUS execution timed out"));
-    }, MAGUS_TIMEOUT);
+    proc.stdout.on("data", d => out += d);
+    proc.stderr.on("data", d => err += d);
 
-    proc.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-
-    proc.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-
-    proc.on("close", (code) => {
-      clearTimeout(timeout);
-
-      if (code !== 0) {
-        reject(new Error(stderr || "MAGUS execution failed"));
-      } else {
-        resolve(stdout);
-      }
+    proc.on("close", code => {
+      code === 0 ? resolve(out) : reject(new Error(err));
     });
   });
 }

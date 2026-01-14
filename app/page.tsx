@@ -28,8 +28,8 @@ export default function BioinformaticsTools() {
         </header>
 
         {/* Description Section */}
-        <section className="space-y-6 mx-auto max-w-3xl">
-          <h1 className="font-bold text-4xl">
+        <section className="space-y-6 mx-auto max-w-4xl">
+          <h1 className="font-bold text-center text-4xl">
             Two Frontiers Project Bioinformatics Tools
           </h1>
 
@@ -43,7 +43,7 @@ export default function BioinformaticsTools() {
           </p>
 
           <p className="text-foreground leading-relaxed">
-            <strong>XTree</strong> is a fast,
+            <em><strong>XTree</strong></em> is a fast,
             memory-efficient sequence aligner built to map short and long reads against
             extremely large reference databases, spanning bacteria, viruses, and
             eukaryotes. It is optimized for whole-genome alignment at scale, enabling
@@ -52,7 +52,7 @@ export default function BioinformaticsTools() {
           </p>
 
           <p className="text-foreground leading-relaxed">
-            <strong>MAGUS</strong> is a modular metagenomic analysis toolkit designed for deeply
+            <em><strong>MAGUS</strong></em> is a modular metagenomic analysis toolkit designed for deeply
             sequenced, multi-domain datasets—particularly those dominated by large
             eukaryotic genomes. Rather than enforcing a fixed pipeline, MAGUS provides
             interoperable tools for iterative assembly, filtering, co-assembly, genome

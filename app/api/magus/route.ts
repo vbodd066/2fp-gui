@@ -17,26 +17,47 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
+    const paramsRaw = formData.get("params");
 
     if (!file) {
-      return NextResponse.json(
-        { error: "No file uploaded" },
-        { status: 400 }
-      );
+      throw new Error("No file uploaded");
     }
 
     if (file.size > MAX_MAGUS_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "File too large for MAGUS web interface" },
-        { status: 400 }
-      );
+      throw new Error("File too large for MAGUS web interface");
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // MAGUS web interface expects shotgun FASTQ
+    // Basic FASTQ / FASTA sanity validation
     validateSequenceFile(buffer, file.name);
 
+    // ---- Parse and validate parameters ----
+    const params: {
+      preset: "eukaryote" | "balanced";
+      minContig: number;
+    } = {
+      preset: "eukaryote",
+      minContig: 1000,
+    };
+
+    if (paramsRaw) {
+      const parsed = JSON.parse(String(paramsRaw));
+
+      if (parsed.preset === "eukaryote" || parsed.preset === "balanced") {
+        params.preset = parsed.preset;
+      }
+
+      if (
+        typeof parsed.minContig === "number" &&
+        parsed.minContig >= 500 &&
+        parsed.minContig <= 10000
+      ) {
+        params.minContig = parsed.minContig;
+      }
+    }
+
+    // ---- Write input to temp storage ----
     const tmpPath = path.join(
       process.cwd(),
       "tmp",
@@ -46,7 +67,8 @@ export async function POST(req: NextRequest) {
 
     await writeFile(tmpPath, buffer);
 
-    const result = await runMAGUS(tmpPath);
+    // ---- Execute MAGUS ----
+    const result = await runMAGUS(tmpPath, params);
 
     return NextResponse.json({
       success: true,
@@ -58,7 +80,7 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   } finally {
-    // Always release lock
+    // Always release job lock
     releaseJobLock();
   }
 }
