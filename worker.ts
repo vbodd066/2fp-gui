@@ -5,6 +5,7 @@ dotenv.config({ path: ".env.local" });
 import fs from "fs/promises";
 import { sendEmail } from "./lib/email/sendEmail";
 import { renderTemplate } from "./lib/email/renderTemplate";
+import { buildXTreeCommand } from "./lib/xtree/buildCommand";
 
 // ---- Job cleanup configuration ----
 const JOB_RETENTION_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -36,9 +37,9 @@ async function cleanupOldJobs() {
     const jobDir = path.join(jobsRoot, jobId);
 
     try {
-      const metaPath = path.join(jobDir, "meta.json");
-      const metaRaw = await fs.readFile(metaPath, "utf8");
-      const meta = JSON.parse(metaRaw);
+      const meta = JSON.parse(
+        await fs.readFile(path.join(jobDir, "meta.json"), "utf8")
+      );
 
       if (!meta.createdAt) continue;
 
@@ -47,7 +48,6 @@ async function cleanupOldJobs() {
         console.log(`🧹 Cleaned up expired job ${jobId}`);
       }
     } catch {
-      // Skip malformed jobs safely
       continue;
     }
   }
@@ -58,7 +58,6 @@ async function runWorker() {
     `Worker started (${USE_EXECUTION_STUBS ? "STUB MODE" : "REAL EXECUTION"})`
   );
 
-  // ---- Dynamic imports (TS + ESM safe) ----
   const { dequeueJob } = await import("./lib/queue/index");
 
   const xtreeModule = USE_EXECUTION_STUBS
@@ -74,11 +73,9 @@ async function runWorker() {
 
   let lastCleanup = 0;
 
-  // ---- Worker loop ----
   while (true) {
     const now = Date.now();
 
-    // ---- Periodic cleanup ----
     if (now - lastCleanup > CLEANUP_INTERVAL_MS) {
       try {
         await cleanupOldJobs();
@@ -89,7 +86,6 @@ async function runWorker() {
     }
 
     const jobId = await dequeueJob();
-
     if (!jobId) {
       await sleep(2000);
       continue;
@@ -99,7 +95,7 @@ async function runWorker() {
     let meta: any;
 
     try {
-      // ---- Load metadata ----
+      /* -------------------- load metadata -------------------- */
       meta = JSON.parse(
         await fs.readFile(path.join(jobDir, "meta.json"), "utf8")
       );
@@ -108,80 +104,83 @@ async function runWorker() {
         await fs.readFile(path.join(jobDir, "params.json"), "utf8")
       );
 
-      // ---- Mark job running ----
       await fs.writeFile(
         path.join(jobDir, "status.json"),
-        JSON.stringify(
-          { status: "running", startedAt: Date.now() },
-          null,
-          2
-        )
+        JSON.stringify({ status: "running", startedAt: Date.now() }, null, 2)
       );
 
-      // ---- Find input file ----
-      const files = await fs.readdir(jobDir);
-      const inputFile = files.find(
-        f =>
-          !["meta.json", "params.json", "status.json", "stdout.log"].includes(f)
-      );
+      /* -------------------- locate inputs -------------------- */
+      const inputDir = path.join(jobDir, "input");
+      const inputFiles = await fs.readdir(inputDir);
 
-      if (!inputFile) {
-        throw new Error("Input file not found");
+      const seqFile = inputFiles.find(f => !f.toLowerCase().includes("map"));
+      const mapFile = inputFiles.find(f => f.toLowerCase().includes("map"));
+
+      if (!seqFile) {
+        throw new Error("Sequence file not found");
       }
 
-      const inputPath = path.join(jobDir, inputFile);
+      const seqPath = path.join(inputDir, seqFile);
+      const mapPath = mapFile ? path.join(inputDir, mapFile) : undefined;
 
-      // ---- Execute tool ----
+      /* -------------------- command provenance -------------------- */
+      if (meta.tool === "xtree") {
+        const { command } = buildXTreeCommand({
+          xtreePath: "xtree",
+          seqPath,
+          params,
+          mapPath,
+        });
+
+        await fs.writeFile(
+          path.join(jobDir, "command.txt"),
+          command
+        );
+      }
+
+      /* -------------------- execute -------------------- */
       let stdout: string;
 
       if (meta.tool === "xtree") {
-        stdout = await runXTree(inputPath, params);
+        stdout = await runXTree(seqPath, params, mapPath);
       } else if (meta.tool === "magus") {
-        stdout = await runMAGUS(inputPath, params);
+        stdout = await runMAGUS(seqPath, params);
       } else {
         throw new Error(`Unknown tool: ${meta.tool}`);
       }
 
-      // ---- Persist output ----
       await fs.writeFile(path.join(jobDir, "stdout.log"), stdout);
 
       await fs.writeFile(
         path.join(jobDir, "status.json"),
-        JSON.stringify(
-          { status: "done", finishedAt: Date.now() },
-          null,
-          2
-        )
+        JSON.stringify({ status: "done", finishedAt: Date.now() }, null, 2)
       );
 
-      console.log(`Job ${jobId} completed successfully`);
-
-      // ---- Send success email (template-based) ----
+      /* -------------------- success email -------------------- */
       try {
-        const templateName =
-          meta.tool === "xtree"
-            ? "xtree-success.txt"
-            : "magus-success.txt";
+        const command = await fs.readFile(
+          path.join(jobDir, "command.txt"),
+          "utf8"
+        );
 
-        const body = await renderTemplate(templateName, {
+        const body = await renderTemplate("xtree-success.txt", {
           jobId: meta.id,
+          mode: meta.mode,
           submittedAt: new Date(meta.createdAt).toLocaleString(),
           completedAt: new Date().toLocaleString(),
+          command,
         });
 
         await sendEmail({
           to: meta.email,
-          subject: `[2FP] ${meta.tool.toUpperCase()} job completed`,
+          subject: "[2FP] XTree job completed",
           text: body,
         });
       } catch (emailErr) {
-        console.error(
-          `Failed to send completion email for job ${jobId}:`,
-          emailErr
-        );
+        console.error("Failed to send success email:", emailErr);
       }
     } catch (err: any) {
-      // ---- Persist failure ----
+      /* -------------------- failure handling -------------------- */
       await fs.writeFile(
         path.join(jobDir, "status.json"),
         JSON.stringify(
@@ -197,36 +196,36 @@ async function runWorker() {
 
       console.error(`Job ${jobId} failed:`, err?.message);
 
-      // ---- Send failure email (template-based) ----
       if (meta?.email) {
         try {
-          const templateName =
-            meta.tool === "xtree"
-              ? "xtree-failure.txt"
-              : "magus-failure.txt";
+          let command = "(command not available)";
+          try {
+            command = await fs.readFile(
+              path.join(jobDir, "command.txt"),
+              "utf8"
+            );
+          } catch {}
 
-          const body = await renderTemplate(templateName, {
+          const body = await renderTemplate("xtree-failure.txt", {
             jobId: meta.id,
+            mode: meta.mode,
             error: err?.message ?? "Unknown error",
+            command,
           });
 
           await sendEmail({
             to: meta.email,
-            subject: `[2FP] ${meta.tool.toUpperCase()} job failed`,
+            subject: "[2FP] XTree job failed",
             text: body,
           });
         } catch (emailErr) {
-          console.error(
-            `Failed to send failure email for job ${jobId}:`,
-            emailErr
-          );
+          console.error("Failed to send failure email:", emailErr);
         }
       }
     }
   }
 }
 
-// ---- Start worker ----
 runWorker().catch(err => {
   console.error("Worker crashed:", err);
   process.exit(1);

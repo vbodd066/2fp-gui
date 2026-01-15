@@ -1,26 +1,48 @@
 import { spawn } from "child_process";
 import path from "path";
+import { buildXTreeCommand, XTreeParams } from "@/lib/xtree/buildCommand";
 
 export function runXTree(
-  inputPath: string,
-  params: { db: string; readType: string; sensitivity: string }
+  seqPath: string,
+  params: XTreeParams,
+  mapPath?: string
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const xtree = path.join(process.cwd(), "scripts/xtree/2FP-XTree/xtree");
+    const xtreePath = path.join(
+      process.cwd(),
+      "scripts/xtree/2FP-XTree/xtree"
+    );
 
-    const args = ["--input", inputPath, "--db", params.db];
+    const { argv } = buildXTreeCommand({
+      xtreePath,
+      seqPath,
+      params,
+      mapPath,
+    });
 
-    if (params.readType === "long") args.push("--long-reads");
-    if (params.sensitivity === "high") args.push("--high-sensitivity");
+    const proc = spawn(argv[0], argv.slice(1));
 
-    const proc = spawn(xtree, args);
-    let out = "", err = "";
+    let stdout = "";
+    let stderr = "";
 
-    proc.stdout.on("data", d => out += d);
-    proc.stderr.on("data", d => err += d);
+    proc.stdout.on("data", d => {
+      stdout += d.toString();
+    });
+
+    proc.stderr.on("data", d => {
+      stderr += d.toString();
+    });
 
     proc.on("close", code => {
-      code === 0 ? resolve(out) : reject(new Error(err));
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        reject(
+          new Error(
+            stderr || `xtree exited with non-zero status: ${code}`
+          )
+        );
+      }
     });
   });
 }

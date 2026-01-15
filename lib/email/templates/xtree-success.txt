@@ -2,8 +2,13 @@ Your XTree job has completed successfully.
 
 Job ID: {{jobId}}
 Tool: XTree
+Mode: {{mode}}
+
 Submitted: {{submittedAt}}
 Completed: {{completedAt}}
+
+Command executed:
+{{command}}
 
 Results are retained for 24 hours.
 

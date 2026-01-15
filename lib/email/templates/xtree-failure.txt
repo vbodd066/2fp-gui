@@ -2,6 +2,10 @@ Your XTree job encountered an error during processing.
 
 Job ID: {{jobId}}
 Tool: XTree
+Mode: {{mode}}
+
+Command attempted:
+{{command}}
 
 Error message:
 {{error}}

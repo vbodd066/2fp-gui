@@ -11,94 +11,112 @@ import {
 } from "@/lib/uploads/limits";
 import { sanitizeFilename } from "@/lib/uploads/sanitize";
 
+type XTreeParams = {
+  mode: "ALIGN" | "BUILD";
+  global?: {
+    threads?: number;
+    logOut?: string;
+  };
+  align?: unknown;
+  build?: unknown;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
 
-    // ---- Enforce exactly one file ----
+    /* -------------------- files -------------------- */
     const files = formData.getAll("file");
     if (files.length !== 1) {
-      throw new Error("Exactly one input file is required");
+      throw new Error("Exactly one sequence file is required");
     }
 
-    const file = files[0];
-    if (!(file instanceof File)) {
-      throw new Error("Invalid file upload");
+    const seqFile = files[0];
+    if (!(seqFile instanceof File)) {
+      throw new Error("Invalid sequence file upload");
     }
 
+    const mapFileRaw = formData.get("mapFile");
+    const mapFile =
+      mapFileRaw instanceof File && mapFileRaw.size > 0
+        ? mapFileRaw
+        : null;
+
+    /* -------------------- email -------------------- */
     const email = formData.get("email");
     if (typeof email !== "string" || email.trim() === "") {
       throw new Error("Email address is required");
     }
 
-    // ---- File size checks ----
-    if (file.size === 0) {
-      throw new Error("Empty file uploaded");
+    /* -------------------- size checks -------------------- */
+    if (seqFile.size === 0) {
+      throw new Error("Empty sequence file uploaded");
     }
 
-    if (file.size > ABSOLUTE_MAX_UPLOAD_SIZE) {
+    if (seqFile.size > ABSOLUTE_MAX_UPLOAD_SIZE) {
       throw new Error("File exceeds absolute maximum upload size");
     }
 
-    if (file.size > MAX_XTREE_UPLOAD_SIZE) {
+    if (seqFile.size > MAX_XTREE_UPLOAD_SIZE) {
       throw new Error("File too large for XTree web interface");
     }
 
-    // ---- Read file buffer ----
-    const buffer = Buffer.from(await file.arrayBuffer());
+    /* -------------------- read + validate sequence -------------------- */
+    const seqBuffer = Buffer.from(await seqFile.arrayBuffer());
+    validateSequenceFile(seqBuffer, seqFile.name);
 
-    // ---- Validate sequence content ----
-    validateSequenceFile(buffer, file.name);
+    const mapBuffer =
+      mapFile !== null
+        ? Buffer.from(await mapFile.arrayBuffer())
+        : null;
 
-    // ---- Parse and validate parameters ----
-    const params: {
-      db: "gtdb" | "refseq";
-      readType: "short" | "long";
-      sensitivity: "standard" | "high";
-    } = {
-      db: "gtdb",
-      readType: "short",
-      sensitivity: "standard",
-    };
-
+    /* -------------------- params -------------------- */
     const paramsRaw = formData.get("params");
-    if (paramsRaw) {
-      const parsed = JSON.parse(String(paramsRaw));
-
-      if (parsed.db === "gtdb" || parsed.db === "refseq") {
-        params.db = parsed.db;
-      }
-
-      if (parsed.readType === "short" || parsed.readType === "long") {
-        params.readType = parsed.readType;
-      }
-
-      if (parsed.sensitivity === "standard" || parsed.sensitivity === "high") {
-        params.sensitivity = parsed.sensitivity;
-      }
+    if (!paramsRaw) {
+      throw new Error("Missing XTree parameters");
     }
 
-    // ---- Create job directory ----
+    let params: XTreeParams;
+    try {
+      params = JSON.parse(String(paramsRaw));
+    } catch {
+      throw new Error("Invalid params JSON");
+    }
+
+    if (params.mode !== "ALIGN" && params.mode !== "BUILD") {
+      throw new Error("Invalid XTree mode");
+    }
+
+    /* -------------------- job directory -------------------- */
     const jobId = randomUUID();
     const jobDir = path.join(process.cwd(), "jobs", jobId);
-    await mkdir(jobDir, { recursive: true });
+    const inputDir = path.join(jobDir, "input");
 
-    // ---- Persist job artifacts ----
-    const safeFilename = sanitizeFilename(file.name);
+    await mkdir(inputDir, { recursive: true });
 
-    await writeFile(path.join(jobDir, safeFilename), buffer);
+    /* -------------------- persist input files -------------------- */
+    const safeSeqName = sanitizeFilename(seqFile.name);
+    await writeFile(path.join(inputDir, safeSeqName), seqBuffer);
 
+    if (mapFile && mapBuffer) {
+      const safeMapName = sanitizeFilename(mapFile.name);
+      await writeFile(path.join(inputDir, safeMapName), mapBuffer);
+    }
+
+    /* -------------------- persist params -------------------- */
     await writeFile(
       path.join(jobDir, "params.json"),
       JSON.stringify(params, null, 2)
     );
 
+    /* -------------------- persist meta (FIX HERE) -------------------- */
     await writeFile(
       path.join(jobDir, "meta.json"),
       JSON.stringify(
         {
           id: jobId,
           tool: "xtree",
+          mode: params.mode, // ✅ CRITICAL FIX
           email,
           createdAt: Date.now(),
         },
@@ -112,7 +130,7 @@ export async function POST(req: NextRequest) {
       JSON.stringify({ status: "queued" }, null, 2)
     );
 
-    // ---- IMPORTANT: no execution here ----
+    /* -------------------- enqueue -------------------- */
     await enqueueJob(jobId);
 
     return NextResponse.json({ ok: true });
