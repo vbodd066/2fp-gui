@@ -18,6 +18,43 @@ export default function XTree() {
   const [error, setError] = useState<string | null>(null);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isDraggingSeq, setIsDraggingSeq] = useState(false);
+  const [isDraggingMap, setIsDraggingMap] = useState(false);
+
+
+/* -------------------- drag handlers -------------------- */
+function onSeqDragOver(e: React.DragEvent<HTMLDivElement>) {
+  e.preventDefault();
+  setIsDraggingSeq(true);
+}
+
+function onSeqDragLeave() {
+  setIsDraggingSeq(false);
+}
+
+function onSeqDrop(e: React.DragEvent<HTMLDivElement>) {
+  e.preventDefault();
+  setIsDraggingSeq(false);
+  const file = e.dataTransfer.files?.[0];
+  if (file) setSeqFile(file);
+}
+
+function onMapDragOver(e: React.DragEvent<HTMLDivElement>) {
+  e.preventDefault();
+  setIsDraggingMap(true);
+}
+
+function onMapDragLeave() {
+  setIsDraggingMap(false);
+}
+
+function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
+  e.preventDefault();
+  setIsDraggingMap(false);
+  const file = e.dataTransfer.files?.[0];
+  if (file) setMapFile(file);
+}
+
 
   /* -------------------- global options -------------------- */
   const [threads, setThreads] = useState<number>(8);
@@ -198,29 +235,112 @@ export default function XTree() {
         </button>
       </div>
 
-      {/* input files */}
-      <div className="space-y-4">
-        <label className="block">
-          Input sequences (FASTA / FASTQ)
+      {/* file upload */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* sequence drag & drop */}
+        <div
+          onDragOver={onSeqDragOver}
+          onDragLeave={onSeqDragLeave}
+          onDrop={onSeqDrop}
+          className={`relative border border-dashed p-6 text-center font-bold transition-colors
+            ${
+              isDraggingSeq || seqFile
+                ? "border-accent text-accent"
+                : "border-secondary/40 text-secondary"
+            }
+          `}
+        >
+          {seqFile && (
+            <button
+              onClick={() => setSeqFile(null)}
+              className="absolute top-2 right-2 text-accent hover:opacity-70"
+              aria-label="Remove sequence file"
+            >
+              ×
+            </button>
+          )}
+
+          {seqFile
+            ? seqFile.name
+            : isDraggingSeq
+            ? "Release to upload file"
+            : "Drag & drop FASTA / FASTQ"}
+        </div>
+
+        {/* sequence browse */}
+        <label
+          className={`border p-6 text-center font-bold cursor-pointer transition-colors
+            ${
+              seqFile
+                ? "border-accent text-accent"
+                : "border-secondary/40 text-accent"
+            }
+          `}
+        >
+          {seqFile ? "File selected" : "Browse files"}
           <input
             type="file"
+            hidden
             accept=".fa,.fasta,.fq,.fastq,.gz"
             onChange={(e) => setSeqFile(e.target.files?.[0] || null)}
-            className="w-full border p-1 bg-transparent"
           />
         </label>
+      </div>
 
-        {mode === "BUILD" && (
-          <label className="block">
-            Taxonomy mapping file (--map)
+      {mode === "BUILD" && (
+        <div className="grid grid-cols-2 gap-4">
+          {/* map drag & drop */}
+          <div
+            onDragOver={onMapDragOver}
+            onDragLeave={onMapDragLeave}
+            onDrop={onMapDrop}
+            className={`relative border border-dashed p-6 text-center font-bold transition-colors
+              ${
+                isDraggingMap || mapFile
+                  ? "border-accent text-accent"
+                  : "border-secondary/40 text-secondary"
+              }
+            `}
+          >
+            {mapFile && (
+              <button
+                onClick={() => setMapFile(null)}
+                className="absolute top-2 right-2 text-accent hover:opacity-70"
+                aria-label="Remove map file"
+              >
+                ×
+              </button>
+            )}
+
+            {mapFile
+              ? mapFile.name
+              : isDraggingMap
+              ? "Release to upload taxonomy map"
+              : "Drag & drop taxonomy map (--map)"}
+          </div>
+
+          {/* map browse */}
+          <label
+            className={`border p-6 text-center font-bold cursor-pointer transition-colors
+              ${
+                mapFile
+                  ? "border-accent text-accent"
+                  : "border-secondary/40 text-accent"
+              }
+            `}
+          >
+            {mapFile ? "Map file selected" : "Browse map file"}
             <input
               type="file"
+              hidden
               onChange={(e) => setMapFile(e.target.files?.[0] || null)}
-              className="w-full border p-1 bg-transparent"
             />
           </label>
-        )}
-      </div>
+        </div>
+
+    )}
+
+
 
       {/* basic settings */}
       <div className="space-y-4">
@@ -315,24 +435,124 @@ export default function XTree() {
             {mode === "ALIGN" && (
               <>
                 <p className="font-bold">Outputs</p>
-                <label><input type="checkbox" checked={outPerq} onChange={e => setOutPerq(e.target.checked)} /> Per-query</label>
-                <label><input type="checkbox" checked={outRef} onChange={e => setOutRef(e.target.checked)} /> Reference</label>
-                <label><input type="checkbox" checked={outTax} onChange={e => setOutTax(e.target.checked)} /> Taxonomy</label>
-                <label><input type="checkbox" checked={outCov} onChange={e => setOutCov(e.target.checked)} /> Coverage</label>
-                <label><input type="checkbox" checked={outOrthog} onChange={e => setOutOrthog(e.target.checked)} /> Orthogonal</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={outPerq}
+                      onChange={e => setOutPerq(e.target.checked)}
+                    />
+                    <span>Per-query</span>
+                  </label>
 
-                <p className="font-bold">Algorithms</p>
-                <label><input type="checkbox" checked={redistribute} onChange={e => setRedistribute(e.target.checked)} /> Redistribute</label>
-                <label><input type="checkbox" checked={fastRedistribute} onChange={e => setFastRedistribute(e.target.checked)} /> Fast redistribute</label>
-                <label><input type="checkbox" checked={shallowLca} onChange={e => setShallowLca(e.target.checked)} /> Shallow LCA</label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={outRef}
+                      onChange={e => setOutRef(e.target.checked)}
+                    />
+                    <span>Reference</span>
+                  </label>
 
-                <p className="font-bold">Performance</p>
-                <label><input type="checkbox" checked={copyMem} onChange={e => setCopyMem(e.target.checked)} /> Copy DB to memory</label>
-                <label><input type="checkbox" checked={doForage} onChange={e => setDoForage(e.target.checked)} /> Do forage</label>
-                <label><input type="checkbox" checked={halfForage} onChange={e => setHalfForage(e.target.checked)} /> Half forage</label>
-                <label><input type="checkbox" checked={noAdamantium} onChange={e => setNoAdamantium(e.target.checked)} /> Disable adamantium</label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={outTax}
+                      onChange={e => setOutTax(e.target.checked)}
+                    />
+                    <span>Taxonomy</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={outCov}
+                      onChange={e => setOutCov(e.target.checked)}
+                    />
+                    <span>Coverage</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={outOrthog}
+                      onChange={e => setOutOrthog(e.target.checked)}
+                    />
+                    <span>Orthogonal</span>
+                  </label>
+                </div>
+
+                <p className="font-bold mt-4">Algorithms</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={redistribute}
+                      onChange={e => setRedistribute(e.target.checked)}
+                    />
+                    <span>Redistribute</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={fastRedistribute}
+                      onChange={e => setFastRedistribute(e.target.checked)}
+                    />
+                    <span>Fast redistribute</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={shallowLca}
+                      onChange={e => setShallowLca(e.target.checked)}
+                    />
+                    <span>Shallow LCA</span>
+                  </label>
+                </div>
+
+                <p className="font-bold mt-4">Performance</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={copyMem}
+                      onChange={e => setCopyMem(e.target.checked)}
+                    />
+                    <span>Copy DB to memory</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={doForage}
+                      onChange={e => setDoForage(e.target.checked)}
+                    />
+                    <span>Do forage</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={halfForage}
+                      onChange={e => setHalfForage(e.target.checked)}
+                    />
+                    <span>Half forage</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={noAdamantium}
+                      onChange={e => setNoAdamantium(e.target.checked)}
+                    />
+                    <span>Disable adamantium</span>
+                  </label>
+                </div>
               </>
             )}
+
           </div>
         )}
       </div>
