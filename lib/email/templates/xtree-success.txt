@@ -1,0 +1,10 @@
+Your XTree job has completed successfully.
+
+Job ID: {{jobId}}
+Tool: XTree
+Submitted: {{submittedAt}}
+Completed: {{completedAt}}
+
+Results are retained for 24 hours.
+
+Thank you for using the Two Frontiers Project bioinformatics tools.

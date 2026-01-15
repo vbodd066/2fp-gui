@@ -1,0 +1,11 @@
+Your MAGUS job encountered an error during processing.
+
+Job ID: {{jobId}}
+Tool: MAGUS
+
+Error message:
+{{error}}
+
+Job data is retained for 24 hours.
+
+If this problem persists, please contact the maintainers with the job ID above.
