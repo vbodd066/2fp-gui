@@ -5,29 +5,49 @@ import { randomUUID } from "crypto";
 import { enqueueJob } from "@/lib/queue";
 
 import { validateSequenceFile } from "@/lib/uploads/validate";
-import { MAX_XTREE_FILE_SIZE } from "@/lib/uploads/limits";
+import {
+  MAX_XTREE_UPLOAD_SIZE,
+  ABSOLUTE_MAX_UPLOAD_SIZE,
+} from "@/lib/uploads/limits";
+import { sanitizeFilename } from "@/lib/uploads/sanitize";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
 
-    const file = formData.get("file") as File | null;
-    const email = formData.get("email") as string | null;
-    const paramsRaw = formData.get("params");
-
-    if (!file) {
-      throw new Error("No file uploaded");
+    // ---- Enforce exactly one file ----
+    const files = formData.getAll("file");
+    if (files.length !== 1) {
+      throw new Error("Exactly one input file is required");
     }
 
-    if (!email) {
+    const file = files[0];
+    if (!(file instanceof File)) {
+      throw new Error("Invalid file upload");
+    }
+
+    const email = formData.get("email");
+    if (typeof email !== "string" || email.trim() === "") {
       throw new Error("Email address is required");
     }
 
-    if (file.size > MAX_XTREE_FILE_SIZE) {
+    // ---- File size checks ----
+    if (file.size === 0) {
+      throw new Error("Empty file uploaded");
+    }
+
+    if (file.size > ABSOLUTE_MAX_UPLOAD_SIZE) {
+      throw new Error("File exceeds absolute maximum upload size");
+    }
+
+    if (file.size > MAX_XTREE_UPLOAD_SIZE) {
       throw new Error("File too large for XTree web interface");
     }
 
+    // ---- Read file buffer ----
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // ---- Validate sequence content ----
     validateSequenceFile(buffer, file.name);
 
     // ---- Parse and validate parameters ----
@@ -41,6 +61,7 @@ export async function POST(req: NextRequest) {
       sensitivity: "standard",
     };
 
+    const paramsRaw = formData.get("params");
     if (paramsRaw) {
       const parsed = JSON.parse(String(paramsRaw));
 
@@ -60,11 +81,12 @@ export async function POST(req: NextRequest) {
     // ---- Create job directory ----
     const jobId = randomUUID();
     const jobDir = path.join(process.cwd(), "jobs", jobId);
-
     await mkdir(jobDir, { recursive: true });
 
     // ---- Persist job artifacts ----
-    await writeFile(path.join(jobDir, file.name), buffer);
+    const safeFilename = sanitizeFilename(file.name);
+
+    await writeFile(path.join(jobDir, safeFilename), buffer);
 
     await writeFile(
       path.join(jobDir, "params.json"),
@@ -92,10 +114,11 @@ export async function POST(req: NextRequest) {
 
     // ---- IMPORTANT: no execution here ----
     await enqueueJob(jobId);
-    return NextResponse.json({ jobId });
+
+    return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message ?? "XTree submission failed" },
+      { error: err?.message ?? "XTree submission failed" },
       { status: 400 }
     );
   }
