@@ -1,26 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { randomUUID } from "crypto";
+import { enqueueJob } from "@/lib/queue";
 
 import { validateSequenceFile } from "@/lib/uploads/validate";
 import { MAX_MAGUS_FILE_SIZE } from "@/lib/uploads/limits";
-import { runMAGUS } from "@/lib/execution/runMAGUS";
-import {
-  acquireJobLock,
-  releaseJobLock,
-} from "@/lib/execution/jobLock";
 
 export async function POST(req: NextRequest) {
   try {
-    // Enforce single-job execution
-    acquireJobLock();
-
     const formData = await req.formData();
+
     const file = formData.get("file") as File | null;
+    const email = formData.get("email") as string | null;
     const paramsRaw = formData.get("params");
 
     if (!file) {
       throw new Error("No file uploaded");
+    }
+
+    if (!email) {
+      throw new Error("Email address is required");
     }
 
     if (file.size > MAX_MAGUS_FILE_SIZE) {
@@ -28,8 +28,6 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-
-    // Basic FASTQ / FASTA sanity validation
     validateSequenceFile(buffer, file.name);
 
     // ---- Parse and validate parameters ----
@@ -57,30 +55,45 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ---- Write input to temp storage ----
-    const tmpPath = path.join(
-      process.cwd(),
-      "tmp",
-      "uploads",
-      `magus-${Date.now()}-${file.name}`
+    // ---- Create job directory ----
+    const jobId = randomUUID();
+    const jobDir = path.join(process.cwd(), "jobs", jobId);
+
+    await mkdir(jobDir, { recursive: true });
+
+    // ---- Persist job artifacts ----
+    await writeFile(path.join(jobDir, file.name), buffer);
+
+    await writeFile(
+      path.join(jobDir, "params.json"),
+      JSON.stringify(params, null, 2)
     );
 
-    await writeFile(tmpPath, buffer);
+    await writeFile(
+      path.join(jobDir, "meta.json"),
+      JSON.stringify(
+        {
+          id: jobId,
+          tool: "magus",
+          email,
+          createdAt: Date.now(),
+        },
+        null,
+        2
+      )
+    );
 
-    // ---- Execute MAGUS ----
-    const result = await runMAGUS(tmpPath, params);
+    await writeFile(
+      path.join(jobDir, "status.json"),
+      JSON.stringify({ status: "queued" }, null, 2)
+    );
 
-    return NextResponse.json({
-      success: true,
-      result,
-    });
+    // ---- IMPORTANT: no execution here ----
+    return NextResponse.json({ jobId });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message ?? "MAGUS execution failed" },
-      { status: 500 }
+      { error: err.message ?? "MAGUS submission failed" },
+      { status: 400 }
     );
-  } finally {
-    // Always release job lock
-    releaseJobLock();
   }
 }

@@ -15,8 +15,16 @@ export function validateSequenceFile(buffer: Buffer, filename: string) {
     throw new Error("Invalid file extension");
   }
 
-  // Optional: simple content sanity check
-  if (text.match(/[^\n\rACGTN>@+\s]/i)) {
-    throw new Error("Unexpected characters in sequence file");
+// Optional: simple content sanity check (FASTA only)
+if (isFasta) {
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    if (line.startsWith(">")) continue;   // ignore headers
+    if (line.trim() === "") continue;     // ignore blank lines
+    if (!/^[ACGTNacgtn]+$/.test(line)) {
+      throw new Error("Unexpected characters in FASTA sequence");
+    }
   }
+}
+
 }

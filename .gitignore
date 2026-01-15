@@ -19,6 +19,7 @@ scripts/xtree/2FP-XTree/
 
 # Temp files while scripts are running
 tmp/
+jobs/
 
 # next.js
 /.next/

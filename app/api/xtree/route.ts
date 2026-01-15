@@ -1,42 +1,102 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { randomUUID } from "crypto";
+import { enqueueJob } from "@/lib/queue";
 
 import { validateSequenceFile } from "@/lib/uploads/validate";
 import { MAX_XTREE_FILE_SIZE } from "@/lib/uploads/limits";
-import { runXTree } from "@/lib/execution/runXtree";
-import { acquireJobLock, releaseJobLock } from "@/lib/execution/jobLock";
 
 export async function POST(req: NextRequest) {
   try {
-    acquireJobLock();
-
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+
+    const file = formData.get("file") as File | null;
+    const email = formData.get("email") as string | null;
     const paramsRaw = formData.get("params");
 
-    if (!file) throw new Error("No file uploaded");
-    if (file.size > MAX_XTREE_FILE_SIZE) throw new Error("File too large");
+    if (!file) {
+      throw new Error("No file uploaded");
+    }
+
+    if (!email) {
+      throw new Error("Email address is required");
+    }
+
+    if (file.size > MAX_XTREE_FILE_SIZE) {
+      throw new Error("File too large for XTree web interface");
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     validateSequenceFile(buffer, file.name);
 
-    const params = { db: "gtdb", readType: "short", sensitivity: "standard" };
+    // ---- Parse and validate parameters ----
+    const params: {
+      db: "gtdb" | "refseq";
+      readType: "short" | "long";
+      sensitivity: "standard" | "high";
+    } = {
+      db: "gtdb",
+      readType: "short",
+      sensitivity: "standard",
+    };
+
     if (paramsRaw) {
-      const p = JSON.parse(String(paramsRaw));
-      if (["gtdb", "refseq"].includes(p.db)) params.db = p.db;
-      if (["short", "long"].includes(p.readType)) params.readType = p.readType;
-      if (["standard", "high"].includes(p.sensitivity)) params.sensitivity = p.sensitivity;
+      const parsed = JSON.parse(String(paramsRaw));
+
+      if (parsed.db === "gtdb" || parsed.db === "refseq") {
+        params.db = parsed.db;
+      }
+
+      if (parsed.readType === "short" || parsed.readType === "long") {
+        params.readType = parsed.readType;
+      }
+
+      if (parsed.sensitivity === "standard" || parsed.sensitivity === "high") {
+        params.sensitivity = parsed.sensitivity;
+      }
     }
 
-    const tmpPath = path.join(process.cwd(), "tmp/uploads", `xtree-${Date.now()}-${file.name}`);
-    await writeFile(tmpPath, buffer);
+    // ---- Create job directory ----
+    const jobId = randomUUID();
+    const jobDir = path.join(process.cwd(), "jobs", jobId);
 
-    const result = await runXTree(tmpPath, params);
-    return NextResponse.json({ result });
+    await mkdir(jobDir, { recursive: true });
+
+    // ---- Persist job artifacts ----
+    await writeFile(path.join(jobDir, file.name), buffer);
+
+    await writeFile(
+      path.join(jobDir, "params.json"),
+      JSON.stringify(params, null, 2)
+    );
+
+    await writeFile(
+      path.join(jobDir, "meta.json"),
+      JSON.stringify(
+        {
+          id: jobId,
+          tool: "xtree",
+          email,
+          createdAt: Date.now(),
+        },
+        null,
+        2
+      )
+    );
+
+    await writeFile(
+      path.join(jobDir, "status.json"),
+      JSON.stringify({ status: "queued" }, null, 2)
+    );
+
+    // ---- IMPORTANT: no execution here ----
+    await enqueueJob(jobId);
+    return NextResponse.json({ jobId });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  } finally {
-    releaseJobLock();
+    return NextResponse.json(
+      { error: err.message ?? "XTree submission failed" },
+      { status: 400 }
+    );
   }
 }
