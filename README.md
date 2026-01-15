@@ -1,36 +1,240 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+=====================================================
+Bioinformatics Web Execution Platform (XTree & MAGUS)
+=====================================================
 
-## Getting Started
+This repository implements a queue-based, asynchronous web execution platform for long-running bioinformatics tools. It is designed to safely accept user-submitted sequencing data, execute computationally intensive analyses in the background, and return results via email without blocking HTTP requests or overloading the web server.
 
-First, run the development server:
+The system currently supports two tools:
+- XTree (large-scale sequence alignment)
+- MAGUS (modular metagenomic assembly and genome recovery)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+The architecture is intentionally general and can be extended to additional tools, HPC execution, or cloud infrastructure without refactoring core components.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+=================================
+High-level architecture overview
+=================================
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The system is composed of four main layers:
+1. Frontend (React / Next.js)
+    - Collects input files, parameters, and an email address
+    - Submits jobs via HTTP
+    - Immediately confirms successful submission
+    - Does not wait for results or poll job status
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. API routes (Next.js server routes)
+    - Validate user input
+    - Persist job data to disk
+    - Enqueue jobs for background processing
+    - Return immediately to the user
 
-## Learn More
+3. Persistent job queue
+    - Disk-backed FIFO queue
+    - Ensures jobs survive crashes and restarts
+    - Guarantees serial execution
 
-To learn more about Next.js, take a look at the following resources:
+4. Background worker
+    - Runs as a standalone Node process
+    - Consumes jobs from the queue
+    - Executes XTree or MAGUS
+    - Writes logs and updates job state
+    - (Optionally) sends completion emails
+    - No execution logic runs inside HTTP request handlers.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+==================
+Design principles
+==================
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The system is built around the following principles:
+1. Asynchronous by design
+        Bioinformatics analyses are treated as background tasks, not request-response operations.
+2. Persistent state
+        Every job is stored on disk as a self-contained directory.
+3. Separation of concerns
+        Each layer has a single, clearly defined responsibility.
+4. Platform flexibility
+        Development can occur on macOS using stub executors, while real execution occurs on Linux or HPC systems.
+5. Failure tolerance
+        All job state is persisted, allowing inspection, debugging, and recovery.
 
-## Deploy on Vercel
+=======================================
+Frontend behavior and user interaction
+=======================================
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Information collected from users
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For every job submission, the frontend collects:
+
+    - Input sequencing file
+        - XTree: FASTA or FASTQ
+        - MAGUS: FASTQ
+
+    - Tool-specific parameters
+
+        XTree:
+        reference database (GTDB or RefSeq)
+        read type (short or long)
+        alignment sensitivity
+
+        MAGUS:
+        analysis preset
+        minimum contig length
+
+    - Email address
+        Required
+        Used as the sole mechanism for delivering results
+
+Submission flow
+
+- The user uploads a file, selects parameters, and enters an email address.
+- The frontend submits the job to the appropriate API route.
+- On success, the UI displays:
+    “Job submission successful. Your results will be emailed to you.”
+- No job ID is shown to the user.
+- No job status polling occurs.
+
+API routes
+
+The backend exposes two primary API routes:
+     /api/xtree
+     /api/magus
+
+Responsibilities of API routes
+
+Each API route performs only the following actions:
+    - Parse multipart form data
+    - Validate file format, size, and content
+    - Validate tool parameters
+    - Create a job directory
+    - Persist job metadata and inputs
+    - Enqueue the job ID
+
+API routes explicitly do not:
+    - execute bioinformatics tools
+    - spawn child processes
+    - manage concurrency
+    - block waiting for results
+
+This ensures fast, reliable HTTP responses.
+
+=====================
+Job persistence model
+=====================
+
+Each job is stored as a directory:
+jobs/<jobId>/
+Where <jobId> is a UUID generated at submission time.
+Job directory contents
+Each job directory contains:
+Input file
+Original filename preserved
+params.json
+Validated tool parameters
+meta.json
+Job metadata
+status.json
+Current job state
+stdout.log
+Execution output (after completion)
+(Optional future outputs directory or archive)
+meta.json
+Stores immutable metadata about the job:
+job ID
+tool name (xtree or magus)
+user email address
+submission timestamp
+This file is used by the worker to determine how to execute the job and where to send notifications.
+status.json
+Tracks the job lifecycle:
+queued
+running
+done
+error
+Timestamps and error messages are recorded when applicable.
+This file is the single authoritative source of job state.
+Queue system
+The queue is implemented as a persistent FIFO list stored on disk.
+enqueueJob(jobId)
+Appends the job ID to the queue
+Called only by API routes
+Happens after all job files are successfully written
+dequeueJob()
+Removes and returns the next job ID
+Called only by the worker
+Returns null if no jobs are available
+Rationale
+A disk-backed queue:
+requires no external services
+survives crashes
+is easy to inspect and debug
+is sufficient for serial execution
+This is appropriate for academic tools and early-stage deployments.
+Worker process
+The worker is a standalone Node.js process and is not part of the Next.js runtime.
+Worker responsibilities
+The worker:
+Polls the job queue
+Loads job metadata and parameters
+Updates job status to running
+Executes the appropriate tool
+Captures output and logs
+Updates job status to done or error
+Continues processing subsequent jobs
+The worker never handles HTTP requests.
+Execution model
+Jobs are executed serially, ensuring:
+predictable resource usage
+no race conditions
+simplified debugging
+Parallelism can be added later if required.
+Execution layer
+The execution layer is pluggable and tool-specific.
+Real execution (Linux / HPC)
+In production environments:
+XTree and MAGUS are executed via their native binaries
+stdout and stderr are captured
+non-zero exit codes mark jobs as failed
+Stub execution (macOS development)
+For development on unsupported platforms:
+Stub functions simulate execution
+Artificial delays mimic runtime
+Predictable output is written to logs
+Stub execution is controlled by an environment variable and requires no code changes.
+Error handling and robustness
+The system is designed to fail safely:
+Each job is isolated in its own directory
+Failures do not affect other jobs
+Errors are persisted to disk
+The worker continues running after failures
+There is no shared mutable state between jobs.
+Notification model
+The system uses email-only notification:
+Users are informed immediately that submission succeeded
+Results are delivered via email when processing completes
+No polling or dashboards are required
+This model reduces complexity while aligning with common bioinformatics usage patterns.
+Authentication and access control
+The current system:
+does not require user authentication
+uses email as the identity anchor
+does not expose job IDs publicly
+This is appropriate for:
+academic tools
+demonstration platforms
+manuscript-linked web interfaces
+Authentication can be added later without refactoring core components.
+Cleanup and lifecycle considerations
+Jobs are currently retained indefinitely.
+Future cleanup policies may include:
+deleting jobs after a fixed time window
+removing failed jobs earlier
+manual or scheduled cleanup scripts
+These policies are operational concerns and do not affect architecture.
+Summary
+This repository implements a robust, extensible backend for asynchronous bioinformatics workflows. It avoids common pitfalls such as blocking HTTP requests, shared temp files, and opaque execution state.
+The system is:
+asynchronous
+persistent
+debuggable
+platform-agnostic
+suitable for academic and production use
+All remaining enhancements (email delivery, downloads, authentication, cleanup) can be added incrementally without architectural changes.

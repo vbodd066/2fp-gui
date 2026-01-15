@@ -8,17 +8,17 @@ export default function XTree() {
   const [readType, setReadType] = useState<"short" | "long">("short");
   const [sensitivity, setSensitivity] = useState<"standard" | "high">("standard");
 
-  const [status, setStatus] = useState<"idle" | "running" | "error" | "done">("idle");
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
 
-  async function runXTree() {
-    if (!file) return;
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    setStatus("running");
+  async function submitXTree() {
+    if (!file || !email) return;
+
+    setSubmitting(true);
     setError(null);
-    setResult(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -35,13 +35,15 @@ export default function XTree() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "XTree failed");
+      if (!res.ok) {
+        throw new Error(data.error || "Job submission failed");
+      }
 
-      setResult(data.result);
-      setStatus("done");
+      setSubmitted(true);
     } catch (err: any) {
       setError(err.message);
-      setStatus("error");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -56,30 +58,36 @@ export default function XTree() {
       <div className="flex justify-between border-b border-secondary/20 pb-3">
         <h3 className="text-lg font-semibold">XTree Alignment</h3>
         <div className="flex gap-4 text-sm">
-          <a href="https://doi.org/10.64898/2025.12.22.696015" target="_blank" className="text-accent hover:underline">
+          <a
+            href="https://doi.org/10.64898/2025.12.22.696015"
+            target="_blank"
+            className="text-accent hover:underline"
+          >
             Manuscript
           </a>
-          <a href="https://github.com/two-frontiers-project/2FP-XTree" target="_blank" className="text-accent hover:underline">
+          <a
+            href="https://github.com/two-frontiers-project/2FP-XTree"
+            target="_blank"
+            className="text-accent hover:underline"
+          >
             GitHub
           </a>
         </div>
       </div>
 
-      {/* information settings about XTree */}
+      {/* Information */}
       <div className="space-y-4 text-md">
         <p>
           XTree works by indexing reference genomes using a k-mer–based representation,
           allowing reads to be matched quickly even when the reference database is large,
-          diverse, or incomplete. This makes it well suited for metagenomic, environmental,
-          and mixed-domain datasets where standard alignment approaches may fail or become
-          prohibitively expensive.
+          diverse, or incomplete. This makes it well suited for metagenomic,
+          environmental, and mixed-domain datasets.
         </p>
 
         <p>
-          This web interface provides access to a curated subset of XTree functionality
-          intended for exploration, demonstration, and small-scale analyses. It is not
-          a replacement for full local or HPC deployments, which offer additional tuning,
-          batching, and performance options.
+          This web interface exposes a demonstration-focused subset of XTree
+          functionality. For large datasets, custom parameters, or batch analyses,
+          we recommend running XTree locally or on HPC infrastructure.
         </p>
       </div>
 
@@ -87,32 +95,21 @@ export default function XTree() {
       <div className="space-y-2 text-md mt-10">
         <p className="font-bold">How to use XTree</p>
         <ol className="list-decimal list-inside space-y-1 font-bold">
-          <li>
-            Upload a sequencing file in FASTA or FASTQ format containing one or more reads.
-          </li>
-          <li>
-            Choose the appropriate reference database, read type, and sensitivity based
-            on your data and analysis goals.
-          </li>
-          <li>
-            Click <em>Run XTree</em> to begin alignment. Progress and results will appear
-            once the job completes.
-          </li>
+          <li>Upload a sequencing file in FASTA or FASTQ format.</li>
+          <li>Select a reference database and alignment parameters.</li>
+          <li>Submit the job and wait for results via email.</li>
         </ol>
       </div>
 
-      {/* Defaults explanation */}
+      {/* Defaults */}
       <p className="text-sm text-secondary">
-        By default, XTree runs using the GTDB reference database in short-read mode with
-        standard sensitivity. These settings are appropriate for most Illumina-style
-        metagenomic datasets and provide a balance between speed and alignment accuracy.
-        For long-read data, alternative references, or maximum sensitivity, consider
-        adjusting the settings or running XTree locally.
+        By default, XTree runs against the GTDB reference database in short-read mode
+        with standard sensitivity. These settings are appropriate for most Illumina-style
+        metagenomic datasets.
       </p>
 
       {/* Settings */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 text-md">
-        {/* Reference database */}
         <div className="space-y-2">
           <label className="font-bold">Reference database</label>
           <select
@@ -123,28 +120,8 @@ export default function XTree() {
             <option value="gtdb">GTDB (default)</option>
             <option value="refseq">RefSeq</option>
           </select>
-
-          <p className="text-sm text-secondary">
-            The reference database defines which genomes XTree aligns reads against.
-            Larger and more diverse databases increase biological coverage but may
-            require additional computation.
-          </p>
-
-          <ul className="text-sm text-secondary list-disc list-inside space-y-1">
-            <li>
-              <strong>GTDB</strong>: Genome Taxonomy Database. A curated,
-              phylogenetically consistent collection of bacterial and archaeal genomes.
-              Recommended for most metagenomic and environmental datasets.
-            </li>
-            <li>
-              <strong>RefSeq</strong>: NCBI Reference Sequence database. Broad coverage
-              across many organism groups, including eukaryotes, but less
-              taxonomically standardized.
-            </li>
-          </ul>
         </div>
 
-        {/* Read type */}
         <div className="space-y-2">
           <label className="font-bold">Read type</label>
           <select
@@ -155,27 +132,8 @@ export default function XTree() {
             <option value="short">Short reads (default)</option>
             <option value="long">Long reads</option>
           </select>
-
-          <p className="text-sm text-secondary">
-            This setting controls how XTree interprets read length and error
-            characteristics during alignment.
-          </p>
-
-          <ul className="text-sm text-secondary list-disc list-inside space-y-1">
-            <li>
-              <strong>Short reads</strong>: Optimized for Illumina-style sequencing
-              data (typically 50–300 bp). This mode prioritizes speed and precision for
-              high-depth datasets.
-            </li>
-            <li>
-              <strong>Long reads</strong>: Designed for Oxford Nanopore or PacBio data,
-              which have longer read lengths and higher error rates. Alignment is more
-              tolerant but may require additional compute.
-            </li>
-          </ul>
         </div>
 
-        {/* Sensitivity */}
         <div className="space-y-2">
           <label className="font-bold">Alignment sensitivity</label>
           <select
@@ -186,24 +144,6 @@ export default function XTree() {
             <option value="standard">Standard (default)</option>
             <option value="high">High sensitivity</option>
           </select>
-
-          <p className="text-sm text-secondary">
-            Sensitivity controls how aggressively XTree searches for potential matches
-            between reads and reference sequences.
-          </p>
-
-          <ul className="text-sm text-secondary list-disc list-inside space-y-1">
-            <li>
-              <strong>Standard</strong>: Balanced mode that provides accurate alignments
-              with faster runtimes. Recommended for most datasets and exploratory
-              analyses.
-            </li>
-            <li>
-              <strong>High sensitivity</strong>: Expands the search space to detect
-              weaker or more divergent matches. Useful for low-abundance organisms or
-              highly diverse samples, but increases runtime and memory usage.
-            </li>
-          </ul>
         </div>
       </div>
 
@@ -219,32 +159,53 @@ export default function XTree() {
 
         <label className="border p-6 text-center text-accent font-bold cursor-pointer">
           Browse files
-          <input type="file" hidden accept=".fa,.fasta,.fq,.fastq,.gz" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <input
+            type="file"
+            hidden
+            accept=".fa,.fasta,.fq,.fastq,.gz"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
         </label>
       </div>
 
+      {/* Email */}
       <div className="space-y-2">
-          <label className="font-bold">*Email address:</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border p-1 bg-transparent"
-          />
-          <p className="text-sm text-secondary">
-            Provide an email address to receive the results and a notification when your XTree job is complete.
-          </p>
+        <label className="font-bold">*Email address</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border p-1 bg-transparent"
+        />
+        <p className="text-sm text-secondary">
+          Results and a notification will be sent to this address once processing is complete.
+        </p>
       </div>
 
-      <button onClick={runXTree}
-      disabled={!file || !email || status === "running"}
-      className="bg-accent/80 px-4 py-2 text-black disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {status === "running" ? "Running…" : "Submit XTree Job"}
-      </button>
+      {/* Submit / Confirmation */}
+      {!submitted ? (
+        <>
+          <button
+            onClick={submitXTree}
+            disabled={!file || !email || submitting}
+            className="bg-accent/80 px-4 py-2 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Submitting…" : "Submit XTree Job"}
+          </button>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-      {result && <pre className="text-xs bg-(--color-codeBg) p-4">{result}</pre>}
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+        </>
+      ) : (
+        <div className="border border-secondary/30 p-4 rounded-md text-sm">
+          <p className="font-semibold">
+            Job submission successful
+          </p>
+          <p className="text-secondary mt-1">
+            Your analysis has been queued. Results will be emailed to you once processing
+            is complete.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

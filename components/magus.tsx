@@ -6,18 +6,18 @@ export default function MAGUS() {
   const [file, setFile] = useState<File | null>(null);
   const [preset, setPreset] = useState<"eukaryote" | "balanced">("eukaryote");
   const [minContig, setMinContig] = useState<number>(1000);
+
   const [email, setEmail] = useState<string>("");
 
-  const [status, setStatus] = useState<"idle" | "running" | "error" | "done">("idle");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<string | null>(null);
 
-  async function runMAGUS() {
-    if (!file) return;
+  async function submitMAGUS() {
+    if (!file || !email) return;
 
-    setStatus("running");
+    setSubmitting(true);
     setError(null);
-    setResult(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -34,13 +34,15 @@ export default function MAGUS() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "MAGUS failed");
+      if (!res.ok) {
+        throw new Error(data.error || "Job submission failed");
+      }
 
-      setResult(data.result);
-      setStatus("done");
+      setSubmitted(true);
     } catch (err: any) {
       setError(err.message);
-      setStatus("error");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -72,21 +74,19 @@ export default function MAGUS() {
         </div>
       </div>
 
-      {/* Information about MAGUS */}
+      {/* Information */}
       <div className="space-y-4 text-md">
-
         <p>
-          MAGUS is particularly well suited for datasets dominated by large or
-          low-abundance genomes, such as microbial eukaryotes, symbionts, and
-          environmental samples where reference-based approaches alone may miss
-          important biological signal.
+          MAGUS is designed for deeply sequenced, multi-domain metagenomic datasets,
+          particularly those dominated by large or low-abundance eukaryotic genomes.
+          It provides modular tools for iterative assembly, filtering, co-assembly,
+          genome recovery, and gene catalog construction.
         </p>
 
         <p>
-          Rather than enforcing a rigid pipeline, MAGUS provides interoperable
-          components that allow workflows to adapt as data complexity and sequencing
-          depth increase. This web interface exposes a simplified, demonstration-focused
-          subset of that functionality.
+          This web interface exposes a simplified, demonstration-focused subset of
+          MAGUS functionality. Full workflows with additional stages and tuning are
+          available via local or HPC deployments.
         </p>
       </div>
 
@@ -94,33 +94,21 @@ export default function MAGUS() {
       <div className="space-y-2 text-md mt-10">
         <p className="font-bold">How to use MAGUS</p>
         <ol className="list-decimal list-inside space-y-1 font-bold">
-          <li>
-            Upload a shotgun metagenomic FASTQ file containing sequencing reads
-            from a mixed biological sample.
-          </li>
-          <li>
-            Select an analysis preset and minimum contig length appropriate for
-            your dataset.
-          </li>
-          <li>
-            Click <em>Run MAGUS</em> to begin the workflow. Assembly and filtering
-            steps will run automatically.
-          </li>
+          <li>Upload a shotgun metagenomic FASTQ file.</li>
+          <li>Select an analysis preset and minimum contig length.</li>
+          <li>Submit the job and wait for results via email.</li>
         </ol>
       </div>
 
-      {/* Defaults explanation */}
+      {/* Defaults */}
       <p className="text-sm text-secondary">
-        By default, MAGUS runs using a eukaryote-dominant analysis preset with a
-        minimum contig length of 1000 bp. These settings are intended to favor the
-        recovery of larger, low-abundance genomes while maintaining conservative
-        filtering. Full workflows with additional stages and tuning are available
-        via local or HPC deployments.
+        By default, MAGUS runs in a eukaryote-dominant mode with a minimum contig
+        length of 1000 bp, favoring the recovery of larger genomic fragments while
+        maintaining conservative filtering.
       </p>
 
       {/* Settings */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10 text-md">
-        {/* Preset */}
         <div className="space-y-2">
           <label className="font-bold">Analysis preset</label>
           <select
@@ -131,28 +119,8 @@ export default function MAGUS() {
             <option value="eukaryote">Eukaryote-dominant (default)</option>
             <option value="balanced">Balanced</option>
           </select>
-
-          <p className="text-sm text-secondary">
-            Presets control how MAGUS balances sensitivity across different domains
-            of life during assembly and filtering.
-          </p>
-
-          <ul className="text-sm text-secondary list-disc list-inside space-y-1">
-            <li>
-              <strong>Eukaryote-dominant</strong>: Optimized for datasets where large
-              eukaryotic genomes or symbionts are expected but may be present at low
-              abundance. Assembly and filtering steps are tuned to preserve longer
-              contigs.
-            </li>
-            <li>
-              <strong>Balanced</strong>: Provides a more even trade-off between
-              bacterial, archaeal, and eukaryotic signal. Suitable for general
-              environmental or host-associated microbiomes.
-            </li>
-          </ul>
         </div>
 
-        {/* Min contig */}
         <div className="space-y-2">
           <label className="font-bold">Minimum contig length (bp)</label>
           <input
@@ -163,22 +131,6 @@ export default function MAGUS() {
             onChange={(e) => setMinContig(Number(e.target.value))}
             className="w-full border p-1 bg-transparent"
           />
-
-          <p className="text-sm text-secondary">
-            This setting controls the minimum length of assembled contigs retained
-            for downstream analysis.
-          </p>
-
-          <ul className="text-sm text-secondary list-disc list-inside space-y-1">
-            <li>
-              Higher thresholds (e.g. ≥1000 bp) reduce noise and favor more
-              confidently assembled genomic fragments.
-            </li>
-            <li>
-              Lower thresholds retain shorter contigs, which may be useful for
-              shallow datasets but can increase false positives and fragmentation.
-            </li>
-          </ul>
         </div>
       </div>
 
@@ -203,31 +155,44 @@ export default function MAGUS() {
         </label>
       </div>
 
-
+      {/* Email */}
       <div className="space-y-2">
-          <label className="font-bold">*Email address:</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border p-1 bg-transparent"
-          />
-          <p className="text-sm text-secondary">
-            Provide an email address to receive the results and a notification when your MAGUS job is complete.
-          </p>
+        <label className="font-bold">*Email address</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border p-1 bg-transparent"
+        />
+        <p className="text-sm text-secondary">
+          Results and a notification will be sent to this address once processing is complete.
+        </p>
       </div>
 
-      <button
-        onClick={runMAGUS}
-        disabled={!file || !email || status === "running"}
-        className="bg-accent/80 px-4 py-2 text-black disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {status === "running" ? "Running…" : "Submit MAGUS Job"}
-      </button>
+      {/* Submit / Confirmation */}
+      {!submitted ? (
+        <>
+          <button
+            onClick={submitMAGUS}
+            disabled={!file || !email || submitting}
+            className="bg-accent/80 px-4 py-2 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Submitting…" : "Submit MAGUS Job"}
+          </button>
 
-
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-      {result && <pre className="text-xs bg-(--color-codeBg) p-4">{result}</pre>}
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+        </>
+      ) : (
+        <div className="border border-secondary/30 p-4 rounded-md text-sm">
+          <p className="font-semibold">
+            Job submission successful
+          </p>
+          <p className="text-secondary mt-1">
+            Your analysis has been queued. Results will be emailed to you once processing
+            is complete.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
