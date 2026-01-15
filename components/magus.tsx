@@ -225,15 +225,16 @@ export default function MAGUS() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
         </>
       ) : (
-        <div className="border border-secondary/30 p-4 rounded-md text-sm">
-          <p className="font-semibold">
+        <div className="border border-green-500/60! p-4 rounded-md text-sm text-green-600!">
+          <p className="font-semibold text-green-600!">
             Job submission successful
           </p>
-          <p className="text-secondary mt-1">
-            Your analysis has been queued. Results will be emailed
-            once processing is complete.
+          <p className="mt-1 text-green-500!">
+            Your analysis has been queued. Results will be emailed to you once
+            processing is complete.
           </p>
         </div>
+
       )}
     </div>
   );
