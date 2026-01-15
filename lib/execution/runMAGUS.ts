@@ -1,27 +1,68 @@
 import { spawn } from "child_process";
 import path from "path";
 
-export function runMAGUS(
+import { compileWorkflow } from "@/lib/magus/compileWorkflow";
+import { buildCommand } from "@/lib/magus/buildCommand";
+
+/**
+ * Execute a compiled MAGUS workflow sequentially.
+ * This function is intentionally side-effectful and boring.
+ */
+export async function runMAGUS(
   inputPath: string,
-  params: { preset: string; minContig: number }
+  params: { stages: any }
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const magus = path.join(process.cwd(), "scripts/magus/2FP_MAGUS/magus");
+  const magusBinary = path.join(
+    process.cwd(),
+    "scripts/magus/2FP_MAGUS/magus"
+  );
 
-    const args = [
-      "--input", inputPath,
-      "--preset", params.preset,
-      "--min-contig", String(params.minContig),
-    ];
+  const workflow = compileWorkflow(params);
 
-    const proc = spawn(magus, args);
-    let out = "", err = "";
+  if (workflow.length === 0) {
+    throw new Error("No MAGUS workflow steps enabled");
+  }
 
-    proc.stdout.on("data", d => out += d);
-    proc.stderr.on("data", d => err += d);
+  let combinedStdout = "";
 
-    proc.on("close", code => {
-      code === 0 ? resolve(out) : reject(new Error(err));
+  for (const step of workflow) {
+    const argv = buildCommand(step);
+
+    // Replace "magus" with absolute binary path
+    argv[0] = magusBinary;
+
+    combinedStdout += `\n# >>> ${argv.join(" ")}\n`;
+
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(argv[0], argv.slice(1), {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      proc.stdout.on("data", d => {
+        combinedStdout += d.toString();
+      });
+
+      proc.stderr.on("data", d => {
+        combinedStdout += d.toString();
+      });
+
+      proc.on("error", err => {
+        reject(err);
+      });
+
+      proc.on("close", code => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `MAGUS step "${step.id}" failed with exit code ${code}`
+            )
+          );
+        }
+      });
     });
-  });
+  }
+
+  return combinedStdout;
 }
