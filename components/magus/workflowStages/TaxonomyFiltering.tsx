@@ -76,21 +76,30 @@ export default function TaxonomyFiltering({
   /* -------------------- render -------------------- */
 
   return (
-    <div className="border border-secondary/30 p-5 space-y-6">
+    <div
+      className={`border border-secondary/30 transition-all
+        ${enabled ? "p-5 space-y-6" : "p-3 space-y-2"}
+      `}
+    >
       {/* header */}
       <div className="flex items-center justify-between">
-        <label className="font-bold text-md">
+        <label
+          className="flex items-center font-bold text-md cursor-pointer
+                    transition-colors duration-150
+                    text-secondary
+                    hover:text-accent hover:scale-104"
+        >
           <input
             type="checkbox"
             checked={enabled}
             onChange={onToggle}
             className="mr-2"
           />
-          Taxonomy & filtering
+          Taxonomy & Filtering
         </label>
 
         <span className="text-sm text-secondary">
-          Uses XTree
+          Optional
         </span>
       </div>
 
@@ -118,6 +127,7 @@ export default function TaxonomyFiltering({
 
             {runTaxonomy && (
               <>
+              <div className="grid grid-cols-2 gap-4">
                 <label className="block">
                   XTree database
                   <select
@@ -125,7 +135,7 @@ export default function TaxonomyFiltering({
                     onChange={(e) =>
                       setDb(e.target.value as any)
                     }
-                    className="w-full border p-1 bg-transparent"
+                    className="w-full border p-1 bg-transparent h-8"
                   >
                     <option value="gtdb">GTDB</option>
                     <option value="refseq">RefSeq</option>
@@ -145,9 +155,10 @@ export default function TaxonomyFiltering({
                         Number(e.target.value)
                       )
                     }
-                    className="w-full border p-1 bg-transparent"
+                    className="w-full border p-1 bg-transparent rounded-lg"
                   />
-                </label>
+                  </label>
+                </div>
               </>
             )}
           </div>
@@ -178,7 +189,7 @@ export default function TaxonomyFiltering({
                         Number(e.target.value)
                       )
                     }
-                    className="w-full border p-1 bg-transparent"
+                    className="w-full border p-1 bg-transparent rounded-lg"
                   />
                 </label>
 
@@ -192,15 +203,14 @@ export default function TaxonomyFiltering({
           {/* advanced toggle */}
           {(runTaxonomy || runFiltering) && (
             <button
-              onClick={() =>
-                setShowAdvanced(!showAdvanced)
-              }
-              className="text-sm text-accent"
-            >
-              {showAdvanced
-                ? "Hide advanced settings"
-                : "Show advanced settings"}
-            </button>
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="text-sm text-accent
+                    transition
+                    hover:text-foreground hover:scale-[1.03]
+                    active:scale-[0.98]"
+        >
+          {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
+        </button>
           )}
 
           {/* advanced */}
@@ -259,35 +269,37 @@ export default function TaxonomyFiltering({
                 Resource limits
               </p>
 
-              <label className="block">
-                Threads per XTree run
-                <input
-                  type="number"
-                  min={1}
-                  value={threads}
-                  onChange={(e) =>
-                    setThreads(
-                      Number(e.target.value)
-                    )
-                  }
-                  className="w-full border p-1 bg-transparent"
-                />
-              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block">
+                  Threads per XTree run
+                  <input
+                    type="number"
+                    min={1}
+                    value={threads}
+                    onChange={(e) =>
+                      setThreads(
+                        Number(e.target.value)
+                      )
+                    }
+                    className="w-full border p-1 bg-transparent rounded-lg"
+                  />
+                </label>
 
-              <label className="block">
-                Max parallel samples
-                <input
-                  type="number"
-                  min={1}
-                  value={maxWorkers}
-                  onChange={(e) =>
-                    setMaxWorkers(
-                      Number(e.target.value)
-                    )
-                  }
-                  className="w-full border p-1 bg-transparent"
-                />
-              </label>
+                <label className="block">
+                  Max parallel samples
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxWorkers}
+                    onChange={(e) =>
+                      setMaxWorkers(
+                        Number(e.target.value)
+                      )
+                    }
+                    className="w-full border p-1 bg-transparent rounded-lg"
+                  />
+                </label>
+              </div>
             </div>
           )}
         </>

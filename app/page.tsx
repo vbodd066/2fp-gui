@@ -42,31 +42,6 @@ export default function BioinformaticsTools() {
             and flexibility. XTree and MAGUS address different parts of this problem.
           </p>
 
-          <p className="text-foreground leading-relaxed">
-            <em><strong>XTree</strong></em> is a fast,
-            memory-efficient sequence aligner built to map short and long reads against
-            extremely large reference databases, spanning bacteria, viruses, and
-            eukaryotes. It is optimized for whole-genome alignment at scale, enabling
-            accurate taxonomic detection and abundance estimation even when references
-            are large, diverse, or incomplete.
-          </p>
-
-          <p className="text-foreground leading-relaxed">
-            <em><strong>MAGUS</strong></em> is a modular metagenomic analysis toolkit designed for deeply
-            sequenced, multi-domain datasets—particularly those dominated by large
-            eukaryotic genomes. Rather than enforcing a fixed pipeline, MAGUS provides
-            interoperable tools for iterative assembly, filtering, co-assembly, genome
-            recovery, and gene catalog construction, allowing workflows to scale with
-            both data complexity and available compute.
-          </p>
-
-          <p className="text-secondary mx-auto max-w-3xl leading-relaxed text-xs">
-           This site provides web-based graphical interfaces for selected functionality from XTree and MAGUS, designed for
-           interactive exploration, demonstration, and small-scale analyses using uploaded FASTA or FASTQ files. For full
-           parameter control, custom workflows, or large datasets, we recommend running both tools locally or on HPC or
-           cloud infrastructure.
-          </p>
-
         </section>
 
         {/* Tabs */}

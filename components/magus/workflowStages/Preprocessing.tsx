@@ -70,17 +70,26 @@ export default function Preprocessing({
   /* -------------------- render -------------------- */
 
   return (
-    <div className="border border-secondary/30 p-5 space-y-6">
+    <div
+      className={`border border-secondary/30 transition-all
+        ${enabled ? "p-5 space-y-6" : "p-3 space-y-2"}
+      `}
+    >
       {/* header */}
       <div className="flex items-center justify-between">
-        <label className="font-bold text-md">
+        <label
+          className="flex items-center font-bold text-md cursor-pointer
+                    transition-colors duration-150
+                    text-secondary
+                    hover:text-accent hover:scale-104"
+        >
           <input
             type="checkbox"
             checked={enabled}
             onChange={onToggle}
             className="mr-2"
           />
-          Read QC & preprocessing
+          Read QC & Preprocessing
         </label>
 
         <span className="text-sm text-secondary">
@@ -169,13 +178,14 @@ export default function Preprocessing({
           {/* advanced toggle */}
           {(runSubsample || runFilter) && (
             <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-sm text-accent"
-            >
-              {showAdvanced
-                ? "Hide advanced settings"
-                : "Show advanced settings"}
-            </button>
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="text-sm text-accent
+                    transition
+                    hover:text-foreground hover:scale-[1.03]
+                    active:scale-[0.98]"
+        >
+          {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
+        </button>
           )}
 
           {/* advanced settings */}
