@@ -1,9 +1,16 @@
-Your MAGUS job has completed successfully.
+Your MAGUS workflow completed successfully.
 
 Job ID: {{jobId}}
 Tool: MAGUS
+
 Submitted: {{submittedAt}}
 Completed: {{completedAt}}
+
+Workflow steps executed:
+{{steps}}
+
+Commands executed:
+{{commands}}
 
 Results are retained for 24 hours.
 

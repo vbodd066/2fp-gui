@@ -15,82 +15,71 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
 
-    // ---- Enforce exactly one file ----
+    /* -------------------- file -------------------- */
     const files = formData.getAll("file");
     if (files.length !== 1) {
       throw new Error("Exactly one input file is required");
     }
 
-    const file = files[0];
-    if (!(file instanceof File)) {
+    const seqFile = files[0];
+    if (!(seqFile instanceof File)) {
       throw new Error("Invalid file upload");
     }
 
+    /* -------------------- email -------------------- */
     const email = formData.get("email");
     if (typeof email !== "string" || email.trim() === "") {
       throw new Error("Email address is required");
     }
 
-    // ---- File size checks ----
-    if (file.size === 0) {
+    /* -------------------- size checks -------------------- */
+    if (seqFile.size === 0) {
       throw new Error("Empty file uploaded");
     }
 
-    if (file.size > ABSOLUTE_MAX_UPLOAD_SIZE) {
+    if (seqFile.size > ABSOLUTE_MAX_UPLOAD_SIZE) {
       throw new Error("File exceeds absolute maximum upload size");
     }
 
-    if (file.size > MAX_MAGUS_UPLOAD_SIZE) {
+    if (seqFile.size > MAX_MAGUS_UPLOAD_SIZE) {
       throw new Error("File too large for MAGUS web interface");
     }
 
-    // ---- Read file buffer ----
-    const buffer = Buffer.from(await file.arrayBuffer());
+    /* -------------------- read + validate sequence -------------------- */
+    const seqBuffer = Buffer.from(await seqFile.arrayBuffer());
+    validateSequenceFile(seqBuffer, seqFile.name);
 
-    // ---- Validate sequence content ----
-    validateSequenceFile(buffer, file.name);
-
-    // ---- Parse and validate parameters ----
-    const params: {
-      preset: "eukaryote" | "balanced";
-      minContig: number;
-    } = {
-      preset: "eukaryote",
-      minContig: 1000,
-    };
-
+    /* -------------------- params (workflow JSON) -------------------- */
     const paramsRaw = formData.get("params");
-    if (paramsRaw) {
-      const parsed = JSON.parse(String(paramsRaw));
-
-      if (parsed.preset === "eukaryote" || parsed.preset === "balanced") {
-        params.preset = parsed.preset;
-      }
-
-      if (
-        typeof parsed.minContig === "number" &&
-        parsed.minContig >= 500 &&
-        parsed.minContig <= 10000
-      ) {
-        params.minContig = parsed.minContig;
-      }
+    if (!paramsRaw) {
+      throw new Error("Missing MAGUS workflow parameters");
     }
 
-    // ---- Create job directory ----
+    let params: unknown;
+    try {
+      params = JSON.parse(String(paramsRaw));
+    } catch {
+      throw new Error("Invalid MAGUS params JSON");
+    }
+
+    /* -------------------- job directory -------------------- */
     const jobId = randomUUID();
     const jobDir = path.join(process.cwd(), "jobs", jobId);
-    await mkdir(jobDir, { recursive: true });
+    const inputDir = path.join(jobDir, "input");
 
-    // ---- Persist job artifacts ----
-    const safeFilename = sanitizeFilename(file.name);
+    await mkdir(inputDir, { recursive: true });
 
-    await writeFile(path.join(jobDir, safeFilename), buffer);
+    /* -------------------- persist input -------------------- */
+    const safeFilename = sanitizeFilename(seqFile.name);
+    await writeFile(path.join(inputDir, safeFilename), seqBuffer);
 
+    /* -------------------- persist params -------------------- */
     await writeFile(
       path.join(jobDir, "params.json"),
       JSON.stringify(params, null, 2)
     );
 
+    /* -------------------- persist metadata -------------------- */
     await writeFile(
       path.join(jobDir, "meta.json"),
       JSON.stringify(
@@ -110,7 +99,7 @@ export async function POST(req: NextRequest) {
       JSON.stringify({ status: "queued" }, null, 2)
     );
 
-    // ---- IMPORTANT: no execution here ----
+    /* -------------------- enqueue -------------------- */
     await enqueueJob(jobId);
 
     return NextResponse.json({ ok: true });

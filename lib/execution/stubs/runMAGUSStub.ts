@@ -1,31 +1,25 @@
-import { compileWorkflow } from "@/lib/magus/compileWorkflow";
+import type { WorkflowStep } from "@/lib/magus/compileWorkflow";
 import { buildCommand } from "@/lib/magus/buildCommand";
 
-export async function runMAGUS(
-  inputPath: string,
-  params: { stages: any }
-): Promise<string> {
+type RunMAGUSArgs = {
+  jobDir: string;
+  inputPath: string;
+  steps: WorkflowStep[];
+};
+
+export async function runMAGUS({
+  inputPath,
+  steps,
+}: RunMAGUSArgs): Promise<string> {
   await new Promise(res => setTimeout(res, 1500));
 
-  const workflow = compileWorkflow(params);
-
-  const lines: string[] = [
+  return [
     "MAGUS stub execution",
     `Input file: ${inputPath}`,
     "",
-    "Planned workflow steps:",
-  ];
-
-  workflow.forEach((step, i) => {
-    const argv = buildCommand(step);
-    lines.push(`${i + 1}. ${argv.join(" ")}`);
-  });
-
-  if (workflow.length === 0) {
-    lines.push("(no steps enabled)");
-  }
-
-  lines.push("", "No execution performed (stub mode)");
-
-  return lines.join("\n");
+    "Steps:",
+    ...steps.map(s => buildCommand(s).join(" ")),
+    "",
+    "(No real execution performed)",
+  ].join("\n");
 }

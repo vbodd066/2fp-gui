@@ -1,10 +1,16 @@
-Your MAGUS job encountered an error during processing.
+Your MAGUS workflow encountered an error during processing.
 
 Job ID: {{jobId}}
 Tool: MAGUS
 
+Failed step:
+{{failedStep}}
+
 Error message:
 {{error}}
+
+Commands executed before failure:
+{{commands}}
 
 Job data is retained for 24 hours.
 

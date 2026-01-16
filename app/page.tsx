@@ -6,7 +6,6 @@ import XTree from "@/components/xtree";
 import MAGUS from "@/components/magus";
 import Citations from "@/components/citations";
 
-
 export default function BioinformaticsTools() {
   const [activeTab, setActiveTab] = useState<"xtree" | "magus">("xtree");
 

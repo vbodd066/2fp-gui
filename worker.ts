@@ -2,6 +2,8 @@ import path from "path";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
+import { compileWorkflow } from "./lib/magus/compileWorkflow";
+import { buildCommand } from "./lib/magus/buildCommand";
 import fs from "fs/promises";
 import { sendEmail } from "./lib/email/sendEmail";
 import { renderTemplate } from "./lib/email/renderTemplate";
@@ -138,13 +140,37 @@ async function runWorker() {
         );
       }
 
+      if (meta.tool === "magus") {
+        const workflowSteps = compileWorkflow(params);
+
+        const argvList = workflowSteps.map(step =>
+          buildCommand(step)
+        );
+
+        const commandText =
+          argvList.length === 0
+            ? "# No MAGUS steps enabled"
+            : argvList.map(argv => argv.join(" ")).join("\n");
+
+        await fs.writeFile(
+          path.join(jobDir, "command.txt"),
+          commandText
+        );
+      }
+
       /* -------------------- execute -------------------- */
       let stdout: string;
 
       if (meta.tool === "xtree") {
         stdout = await runXTree(seqPath, params, mapPath);
       } else if (meta.tool === "magus") {
-        stdout = await runMAGUS(seqPath, params);
+        const steps = compileWorkflow(params);
+
+        stdout = await runMAGUS({
+          jobDir,
+          inputPath: seqPath,
+          steps,
+        });
       } else {
         throw new Error(`Unknown tool: ${meta.tool}`);
       }
@@ -158,27 +184,58 @@ async function runWorker() {
 
       /* -------------------- success email -------------------- */
       try {
-        const command = await fs.readFile(
-          path.join(jobDir, "command.txt"),
-          "utf8"
-        );
+        if (meta.tool === "xtree") {
+          const command = await fs.readFile(
+            path.join(jobDir, "command.txt"),
+            "utf8"
+          );
 
-        const body = await renderTemplate("xtree-success.txt", {
-          jobId: meta.id,
-          mode: meta.mode,
-          submittedAt: new Date(meta.createdAt).toLocaleString(),
-          completedAt: new Date().toLocaleString(),
-          command,
-        });
+          const body = await renderTemplate("xtree-success.txt", {
+            jobId: meta.id,
+            mode: meta.mode,
+            submittedAt: new Date(meta.createdAt).toLocaleString(),
+            completedAt: new Date().toLocaleString(),
+            command,
+          });
 
-        await sendEmail({
-          to: meta.email,
-          subject: "[2FP] XTree job completed",
-          text: body,
-        });
+          await sendEmail({
+            to: meta.email,
+            subject: "[2FP] XTree job completed",
+            text: body,
+          });
+        }
+
+        if (meta.tool === "magus") {
+          const stepsDir = path.join(jobDir, "steps");
+          const stepIds = await fs.readdir(stepsDir);
+
+          const commands = await Promise.all(
+            stepIds.map(step =>
+              fs.readFile(
+                path.join(stepsDir, step, "command.txt"),
+                "utf8"
+              )
+            )
+          );
+
+          const body = await renderTemplate("magus-success.txt", {
+            jobId: meta.id,
+            submittedAt: new Date(meta.createdAt).toLocaleString(),
+            completedAt: new Date().toLocaleString(),
+            steps: stepIds.map(s => `- ${s}`).join("\n"),
+            commands: commands.join("\n"),
+          });
+
+          await sendEmail({
+            to: meta.email,
+            subject: "[2FP] MAGUS workflow completed",
+            text: body,
+          });
+        }
       } catch (emailErr) {
         console.error("Failed to send success email:", emailErr);
       }
+
     } catch (err: any) {
       /* -------------------- failure handling -------------------- */
       await fs.writeFile(
@@ -198,26 +255,76 @@ async function runWorker() {
 
       if (meta?.email) {
         try {
-          let command = "(command not available)";
-          try {
-            command = await fs.readFile(
-              path.join(jobDir, "command.txt"),
-              "utf8"
-            );
-          } catch {}
+          if (meta.tool === "xtree") {
+            let command = "(command not available)";
+            try {
+              command = await fs.readFile(
+                path.join(jobDir, "command.txt"),
+                "utf8"
+              );
+            } catch {}
 
-          const body = await renderTemplate("xtree-failure.txt", {
-            jobId: meta.id,
-            mode: meta.mode,
-            error: err?.message ?? "Unknown error",
-            command,
-          });
+            const body = await renderTemplate("xtree-failure.txt", {
+              jobId: meta.id,
+              mode: meta.mode,
+              error: err?.message ?? "Unknown error",
+              command,
+            });
 
-          await sendEmail({
-            to: meta.email,
-            subject: "[2FP] XTree job failed",
-            text: body,
-          });
+            await sendEmail({
+              to: meta.email,
+              subject: "[2FP] XTree job failed",
+              text: body,
+            });
+          }
+
+          if (meta.tool === "magus") {
+            let commands = "(no commands executed)";
+            let failedStep = "(unknown)";
+
+            try {
+              const stepsDir = path.join(jobDir, "steps");
+              const stepIds = await fs.readdir(stepsDir);
+
+              for (const step of stepIds) {
+                const status = JSON.parse(
+                  await fs.readFile(
+                    path.join(stepsDir, step, "status.json"),
+                    "utf8"
+                  )
+                );
+
+                if (status.status === "error") {
+                  failedStep = step;
+                  break;
+                }
+              }
+
+              const completedCommands = await Promise.all(
+                stepIds.map(step =>
+                  fs.readFile(
+                    path.join(stepsDir, step, "command.txt"),
+                    "utf8"
+                  )
+                )
+              );
+
+              commands = completedCommands.join("\n");
+            } catch {}
+
+            const body = await renderTemplate("magus-failure.txt", {
+              jobId: meta.id,
+              failedStep,
+              error: err?.message ?? "Unknown error",
+              commands,
+            });
+
+            await sendEmail({
+              to: meta.email,
+              subject: "[2FP] MAGUS workflow failed",
+              text: body,
+            });
+          }
         } catch (emailErr) {
           console.error("Failed to send failure email:", emailErr);
         }

@@ -187,8 +187,8 @@ const dependencyWarnings = useMemo(() => {
   return (
     <div className="space-y-10 w-full">
       {/* header */}
-      <div className="flex justify-between border-b border-secondary/20 pb-3">
-        <h3 className="text-lg font-semibold">MAGUS Workflow</h3>
+      <div className="flex justify-between pb-3">
+        <h3 className="text-xl font-semibold">MAGUS Workflow</h3>
         <div className="flex gap-4 text-sm">
           <a
             href="https://doi.org/10.64898/2025.12.22.696022"
@@ -206,12 +206,6 @@ const dependencyWarnings = useMemo(() => {
           </a>
         </div>
       </div>
-
-      {/* description */}
-      <p className="text-md">
-        MAGUS is a modular metagenomic workflow. Enable only the stages you need.
-        Advanced options are hidden by default to reduce complexity.
-      </p>
 
       {dependencyWarnings.length > 0 && (
       <div className="border border-yellow-500/40 bg-yellow-500/5 p-4 text-sm">

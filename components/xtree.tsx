@@ -217,23 +217,58 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
   /* -------------------- render -------------------- */
   return (
     <div className="space-y-8 w-full">
-      <h3 className="text-lg font-semibold">XTree Web Interface</h3>
+      <div className="flex justify-between pb-3">
+
+        {/* header */}
+        <h3 className="text-xl font-semibold">XTree Workflow</h3>
+        <div className="flex gap-4 text-sm">
+          <a
+            href="https://doi.org/10.64898/2025.12.22.696015"
+            target="_blank"
+            className="text-accent hover:underline"
+          >
+            Manuscript
+          </a>
+          <a
+            href="https://github.com/two-frontiers-project/2FP-XTree"
+            target="_blank"
+            className="text-accent hover:underline"
+          >
+            GitHub
+          </a>
+        </div>
+      </div>
+
 
       {/* mode selector */}
-      <div className="flex gap-4">
+      <div className="flex gap-3">
         <button
           onClick={() => setMode("ALIGN")}
-          className={mode === "ALIGN" ? "text-accent font-bold" : ""}
+          className={`px-4 py-2 rounded-full border transition
+            ${
+              mode === "ALIGN"
+                ? "bg-accent text-black border-accent font-semibold"
+                : "border-secondary/40 text-secondary hover:border-accent hover:text-accent"
+            }
+          `}
         >
           ALIGN
         </button>
+
         <button
           onClick={() => setMode("BUILD")}
-          className={mode === "BUILD" ? "text-accent font-bold" : ""}
+          className={`px-4 py-2 rounded-full border transition
+            ${
+              mode === "BUILD"
+                ? "bg-accent text-black border-accent font-semibold"
+                : "border-secondary/40 text-secondary hover:border-accent hover:text-accent"
+            }
+          `}
         >
           BUILD
         </button>
       </div>
+
 
       {/* file upload */}
       <div className="grid grid-cols-2 gap-4">
@@ -347,7 +382,7 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
         <p className="font-bold">Basic settings</p>
 
         {mode === "ALIGN" && (
-          <>
+          <div className="grid grid-cols-2 gap-4">
             <label className="block">
               Database
               <select
@@ -370,8 +405,9 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
                 className="w-full border p-1 bg-transparent"
               />
             </label>
-          </>
+          </div>
         )}
+
 
         {mode === "BUILD" && (
           <>
