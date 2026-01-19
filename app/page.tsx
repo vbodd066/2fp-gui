@@ -51,7 +51,7 @@ export default function BioinformaticsTools() {
               onClick={() => setActiveTab("xtree")}
               className={`flex-1 px-4 py-3 text-sm text-center font-semibold transition ${
                 activeTab === "xtree"
-                  ? "border-b-2 border-accent text-accent"
+                  ? "border-b-4 border-accent text-accent"
                   : "text-secondary hover:text-foreground"
               }`}
             >
@@ -62,7 +62,7 @@ export default function BioinformaticsTools() {
               onClick={() => setActiveTab("magus")}
               className={`flex-1 px-4 py-3 text-sm text-center font-semibold transition ${
                 activeTab === "magus"
-                  ? "border-b-2 border-accent text-accent"
+                  ? "border-b-4 border-accent text-accent"
                   : "text-secondary hover:text-foreground"
               }`}
             >

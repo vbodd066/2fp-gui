@@ -437,13 +437,16 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
 
           {/* map browse */}
           <label
-            className={`border p-6 text-center font-bold cursor-pointer transition-colors rounded-lg
-              ${
-                mapFile
-                  ? "border-accent text-accent"
-                  : "border-secondary/40 text-accent"
-              }
-            `}
+            className={`border p-6 text-center font-bold cursor-pointer
+                        transition
+                        rounded-lg
+                        hover:scale-[1.02]
+                        ${
+                          seqFile
+                            ? "border-accent text-accent"
+                            : "border-secondary/40 text-accent hover:border-accent hover:text-foreground"
+                        }
+                      `}
           >
             {mapFile ? "Map file selected" : "Browse map file"}
             <input
@@ -544,7 +547,7 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
               </label>
 
               <label className="block">
-                Log output file
+                Log output file name
                 <input
                   type="text"
                   value={logOut}
