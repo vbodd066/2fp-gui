@@ -2,10 +2,10 @@
 
 | Field            | Value                                      |
 | ---------------- | ------------------------------------------ |
-| **Status**       | Draft                                      |
+| **Status**       | Updated draft                              |
 | **Author**       | Victor Boddy                               |
 | **Created**      | 2026-03-09                                 |
-| **Last updated** | 2026-03-09                                 |
+| **Last updated** | 2026-03-09 (requirements interview)         |
 | **Target start** | TBD                                        |
 
 ---
@@ -28,16 +28,18 @@ This refactor transitions the platform to a **per-customer isolated AWS deployme
 | G2  | **Remove the job queue** — XTree and MAGUS execute directly in the user's session; no background worker or polling loop. |
 | G3  | **Remove email notifications** — results are surfaced in-app in real time since the user is present on their own instance. |
 | G4  | **Cell-based MAGUS execution** — each pipeline stage runs independently with its own input/output, status, and logs, analogous to a Jupyter notebook cell. |
-| G5  | **Paid account model** — introduce a billing/provisioning layer that spins up a new AWS instance for each customer. |
+| G5  | **Paid account model** — introduce a billing/provisioning layer that spins up a new AWS instance for each customer, with usage-based billing and in-app dashboard. |
+| G6  | **Simple shared authentication** — access controlled by a shared password/access code per instance, no per-user accounts for v1. |
 
 ### 2.2 Non-Goals
 
 | #    | Non-Goal                                                                                 |
 | ---- | ---------------------------------------------------------------------------------------- |
-| NG1  | Building a multi-tenant SaaS on a single shared server.                                  |
+| NG1  | Building a multi-tenant SaaS on a single shared server (future V2 possible).             |
 | NG2  | Rewriting XTree or MAGUS CLI tools themselves — only the web GUI and execution layer change. |
 | NG3  | Mobile-responsive design (desktop-first bioinformatics tool).                            |
 | NG4  | Implementing a custom container orchestration layer — standard AWS services will be used. |
+| NG5  | On-premises or container-based deployment (future V2 possible).                          |
 
 ---
 
@@ -102,7 +104,7 @@ User (browser)
 
 ## 4  Proposed Architecture
 
-### 4.1 Deployment Model — Per-Customer AWS Instances
+### 4.1 Deployment Model — Per-Customer AWS EC2 Instances
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -138,29 +140,31 @@ User (browser)
 
 | Concern                | Consideration                                                  |
 | ---------------------- | -------------------------------------------------------------- |
-| Instance type          | Compute-optimized (e.g. `c6i.xlarge` or higher for MAGUS)     |
+| Instance type          | Compute-optimized EC2 (e.g. `c6i.xlarge` or higher for MAGUS)  |
 | Storage                | EBS gp3 volume, sized per customer needs                       |
-| AMI                    | Custom AMI with Node.js, Python, MAGUS deps, XTree binary     |
-| Networking             | VPC per customer or shared VPC with security groups             |
+| AMI                    | Custom AMI with Node.js, Python, MAGUS deps, XTree binary      |
+| Networking             | VPC per customer or shared VPC with security groups            |
 | DNS                    | Subdomain per customer (e.g. `<slug>.2fp.bio`)                 |
 | HTTPS                  | ACM certificate + ALB, or Caddy/nginx on-instance              |
 | Shutdown               | Auto-stop after idle period; user can restart from portal       |
+| Authentication         | Shared password/access code gate for lab access                |
 
 ### 4.2 Provisioning Flow
 
 1. User signs up on the central 2FP marketing/billing site.
-2. Payment is processed (Stripe or similar).
+2. Payment is processed (Stripe integration).
 3. Provisioning service (Lambda, Step Functions, or simple script):
-   - Launches an EC2 instance from the 2FP custom AMI.
-   - Clones/copies the latest codebase onto the instance.
-   - Sets environment variables (instance ID, customer ID, etc.).
-   - Configures DNS record (`<customer>.2fp.bio → instance IP`).
-   - Runs `npm run build && npm start` (or PM2 / systemd service).
-4. User receives their instance URL and can begin using the tools.
+  - Launches an EC2 instance from the 2FP custom AMI.
+  - Clones/copies the latest codebase onto the instance.
+  - Sets environment variables (instance ID, customer ID, etc.).
+  - Configures DNS record (`<customer>.2fp.bio → instance IP`).
+  - Runs `npm run build && npm start` (or PM2 / systemd service).
+  - Sets shared password/access code for lab access.
+4. User receives their instance URL and access code, and can begin using the tools.
 
 ### 4.3 Infrastructure-as-Code
 
-All provisioning should be codified (Terraform, AWS CDK, or Pulumi) to ensure reproducibility. The IaC repository will be separate from this GUI codebase.
+All provisioning should be codified (Terraform, AWS CDK, or Pulumi) to ensure reproducibility. The IaC repository will be separate from this GUI codebase. Stripe integration for billing and instance lifecycle events (stop/start/terminate) is required.
 
 ---
 
@@ -186,6 +190,7 @@ In the current shared-server model, a background worker is required because mult
 | Email field in UI                | Email `<input>` in `components/magus.tsx` and `components/xtree.tsx` |
 | Email field in API routes        | Email validation in `app/api/magus/route.ts` and `app/api/xtree/route.ts` |
 | Nodemailer dependency            | `nodemailer` and `@types/nodemailer` in `package.json`       |
+| Billing/instance lifecycle email | Email integration for billing, password resets, and lifecycle events |
 
 ### 5.3 New Execution Model
 
@@ -405,12 +410,14 @@ Response:
 | Component (new/modified)                        | Responsibility                                              |
 | ----------------------------------------------- | ----------------------------------------------------------- |
 | `components/magus/MagusNotebook.tsx` (new)      | Top-level container, manages array of `MagusCell` state     |
+| `components/magus/MagusNotebook.tsx` (new)      | Top-level container, manages array of `MagusCell` state     |
 | `components/magus/MagusCell.tsx` (new)           | Single cell: config panel + run button + output viewer      |
 | `components/magus/CellOutput.tsx` (new)          | Live-streaming stdout/stderr display with auto-scroll       |
 | `components/magus/CellToolbar.tsx` (new)         | "Run All", "Run From Here", "Reset All" toolbar             |
 | `components/magus/workflowStages/*.tsx` (modify) | Retain existing config UIs, but embed inside `MagusCell`    |
 | `components/magus/dependencies.ts` (modify)      | Keep dependency rules; surface as warnings on cells, not blockers |
 | `components/magus.tsx` (rewrite)                 | Thin wrapper that renders `<MagusNotebook />`               |
+| `components/dashboard/Dashboard.tsx` (new)       | Dashboard screen showing usage, billing, and navigation     |
 
 ### 6.7 Inter-Cell Data Flow
 
@@ -480,7 +487,7 @@ The existing `STAGE_DEPENDENCY_RULES` from `components/magus/dependencies.ts` wi
 
 ## 8  Upload Size Limits
 
-Currently defined in `lib/uploads/limits.ts`. On a per-customer instance the limits can be relaxed since the user is only impacting their own machine. Consider:
+Currently defined in `lib/uploads/limits.ts`. On a per-customer instance the limits can be relaxed since the user is only impacting their own machine. No S3 backup or bulk download for v1; users download individual files only.
 
 | Limit                    | Current value | Proposed change                     |
 | ------------------------ | ------------- | ----------------------------------- |
@@ -538,16 +545,17 @@ Currently defined in `lib/uploads/limits.ts`. On a per-customer instance the lim
 
 | #   | Question                                                                                      | Status      |
 | --- | --------------------------------------------------------------------------------------------- | ----------- |
-| Q1  | Which AWS instance type(s) should be offered? Single tier or multiple?                        | Open        |
+| Q1  | Which AWS EC2 instance type(s) should be offered? Single tier or multiple?                    | Open        |
 | Q2  | Should the provisioning plane be a separate Next.js app, or a serverless API (Lambda)?        | Open        |
-| Q3  | Payment processor — Stripe? AWS Marketplace?                                                  | Open        |
+| Q3  | Payment processor — Stripe integration for automated billing?                                 | Stripe      |
 | Q4  | Should instances auto-sleep after idle time to reduce cost? If so, what timeout?              | Open        |
-| Q5  | Should the codebase be delivered via AMI bake, `git clone`, or Docker image?                  | Open        |
-| Q6  | Do we need persistent storage (S3 sync) for outputs, or is ephemeral EBS sufficient?         | Open        |
-| Q7  | Should the cell-based MAGUS support uploading intermediate files (e.g. user's own contigs)?   | Open        |
-| Q8  | SSE vs. WebSocket for streaming — SSE is simpler but unidirectional; is that sufficient?      | Leaning SSE |
-| Q9  | Does the customer-facing instance need authentication, or is network isolation sufficient?    | Open        |
+| Q5  | Should the codebase be delivered via AMI bake or git clone?                                  | AMI         |
+| Q6  | Do we need persistent storage (S3 sync) for outputs, or is ephemeral EBS sufficient?         | EBS for v1  |
+| Q7  | Should the cell-based MAGUS support uploading intermediate files (e.g. user's own contigs)?   | Future V2   |
+| Q8  | SSE vs. WebSocket for streaming — SSE is simpler but unidirectional; is that sufficient?      | SSE         |
+| Q9  | Shared password/access code for authentication; no per-user accounts for v1.                  | Decided     |
 | Q10 | Should we support instance updates (new codebase versions) in-place or via re-provisioning?   | Open        |
+| Q11 | Multi-tenant SaaS or on-premises support for V2?                                             | Future V2   |
 
 ---
 
@@ -558,9 +566,10 @@ Currently defined in `lib/uploads/limits.ts`. On a per-customer instance the lim
 | AWS costs scale linearly with customer count             | High   | Auto-stop idle instances; right-size instance types; reserved instances |
 | Instance provisioning is slow (minutes)                  | Medium | Pre-warm pool of instances; async provisioning with status page  |
 | Codebase drift between instances                         | Medium | Immutable AMI versioning; automated update pipeline              |
-| User loses data if instance is terminated                | High   | S3 backup of outputs; clear warnings before termination          |
+| User loses data if instance is terminated                | High   | EBS persists until terminated; clear warnings before deletion    |
 | Long-running MAGUS stages cause browser timeout          | Medium | SSE streaming keeps connection alive; reconnect logic            |
 | Single-user instance underutilizes resources             | Low    | Right-size instances; allow instance resizing                    |
+| Stripe/AWS API outages                                  | Medium | Graceful degradation: hide usage dashboard, disable job submission |
 
 ---
 
@@ -573,6 +582,8 @@ Currently defined in `lib/uploads/limits.ts`. On a per-customer instance the lim
 | Zero cross-customer data leakage incidents                     | 0                           |
 | Customer can run full MAGUS pipeline interactively              | End-to-end in browser       |
 | Codebase has no references to queue, email, or worker           | 0 dead-code references      |
+| Usage dashboard reflects AWS costs within 2-3 days              | Accurate, timely            |
+| Password reset and lifecycle emails delivered reliably          | Yes                         |
 
 ---
 
