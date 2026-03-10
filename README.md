@@ -320,6 +320,150 @@ Future cleanup policies may include:
 
 These are operational concerns and do not affect the architecture.
 
+=======================
+Technology Stack
+=======================
+
+Frontend:
+    - Next.js 16.1.1 (React 19.2.3)
+    - TypeScript
+    - Tailwind CSS 4.1.18
+    - Lucide React (icons)
+
+Backend:
+    - Next.js API routes
+    - Node.js with TypeScript
+    - tsx for TypeScript execution
+    - nodemailer for email notifications
+    - File-based job queue (no database required)
+
+Bioinformatics Tools:
+    - XTree: Phylogenetic placement and taxonomic classification
+    - MAGUS: Modular Assembly and Genome recovery Unified System
+
+=======================
+Project Structure
+=======================
+
+Key directories:
+
+app/
+    - Next.js 16 app directory structure
+    - Frontend pages and API routes
+    - globals.css for styling
+
+components/
+    - React components for XTree and MAGUS interfaces
+    - citations.tsx: Reference citations
+    - magus.tsx: MAGUS workflow UI
+    - xtree.tsx: XTree workflow UI
+    - magus/: MAGUS-specific components
+        - dependencies.ts: Dependency graph logic
+        - workflowStages/: Stage-specific UI components
+
+lib/
+    - Shared utilities and core business logic
+    - email/: Email template rendering and sending
+    - execution/: Job execution and locking
+    - magus/: MAGUS command building and workflow compilation
+    - queue/: Job queue implementation
+    - uploads/: File validation and sanitization
+    - xtree/: XTree command building
+
+jobs/
+    - Job storage directory (each job gets its own UUID subdirectory)
+    - queue.json: Persistent job queue
+
+scripts/
+    - magus/2FP_MAGUS/: Complete MAGUS pipeline implementation
+    - xtree/2FP-XTree/: XTree tool implementation
+
+worker.ts
+    - Standalone background worker process
+    - Polls queue and executes jobs
+
+=======================
+Development Workflow
+=======================
+
+1. Install dependencies:
+    npm install
+
+2. Configure environment variables:
+    Create a .env.local file with:
+        SMTP_HOST=<your-smtp-server>
+        SMTP_PORT=<port>
+        SMTP_USER=<username>
+        SMTP_PASS=<password>
+        FROM_EMAIL=<sender-email>
+
+3. Run the frontend and API:
+    npm run dev
+
+4. Run the background worker:
+    USE_EXECUTION_STUBS=true npx tsx worker.ts
+
+    For production execution (Linux/HPC only):
+    npx tsx worker.ts
+
+5. Access the application:
+    http://localhost:3000
+
+=======================
+Testing Strategy
+=======================
+
+Development Testing:
+    - USE_EXECUTION_STUBS=true enables stub execution
+    - Simulates tool execution without requiring actual binaries
+    - Generates predictable output for testing email and state management
+    - Works on any platform (macOS, Windows, Linux)
+
+Production Testing:
+    - Remove USE_EXECUTION_STUBS or set to false
+    - Requires actual XTree and MAGUS binaries
+    - Linux/HPC environment typically required
+    - Full end-to-end execution with real bioinformatics tools
+
+=======================
+MAGUS Workflow Stages
+=======================
+
+The MAGUS pipeline consists of several modular stages:
+
+1. Input & Execution Setup
+    - File validation and parameter configuration
+
+2. Preprocessing
+    - Quality control and read filtering
+    - Adapter trimming and quality assessment
+
+3. Assembly & Binning
+    - Metagenomic assembly
+    - Contig binning and clustering
+
+4. Annotation & Gene Catalog
+    - ORF calling and annotation
+    - Gene catalog construction
+
+5. Taxonomy & Filtering
+    - Taxonomic classification
+    - Contamination filtering
+
+6. Phylogeny & Final Processing
+    - Phylogenetic tree building
+    - MAG dereplication and finalization
+
+7. Specialized Analyses
+    - Eukaryotic detection
+    - Viral identification
+    - Host genome assembly
+
+Each stage is represented in the UI with:
+    - Parameter configuration options
+    - Dependency visualization
+    - Conditional activation based on previous stages
+
 =========
 Summary
 =========
@@ -338,3 +482,164 @@ The system is:
 
 All remaining enhancements (authentication, downloads, cleanup, scaling) can be
 added incrementally without architectural changes.
+
+=======================
+Next Steps to Complete
+=======================
+
+Critical for Production:
+
+1. Email Configuration Verification
+    - Test email delivery with production SMTP settings
+    - Implement email template customization
+    - Add result attachment handling for large outputs
+
+2. File Size and Security Hardening
+    - Implement file size limits enforcement
+    - Add virus scanning for uploaded files
+    - Implement rate limiting per IP address
+    - Add CAPTCHA or similar anti-abuse measures
+
+3. Job Cleanup and Retention Policy
+    - Implement automated job cleanup after N days
+    - Add configuration for retention policies
+    - Create admin script for manual cleanup
+    - Archive completed jobs to cheaper storage
+
+4. Error Handling and Recovery
+    - Improve error messages in failure emails
+    - Add automatic retry logic for transient failures
+    - Implement dead letter queue for permanently failed jobs
+    - Add health check endpoint for monitoring
+
+5. Production Deployment
+    - Configure reverse proxy (nginx/Apache)
+    - Set up SSL/TLS certificates
+    - Configure worker as systemd service or similar
+    - Set up log rotation
+    - Implement monitoring and alerting
+
+6. Result Download Interface
+    - Add secure download links in completion emails
+    - Implement time-limited signed URLs
+    - Create web interface for result download
+    - Add result preview functionality
+
+Nice-to-Have Enhancements:
+
+7. Authentication and User Accounts
+    - Implement user registration and login
+    - Add job history per user
+    - Create user dashboard
+    - Add OAuth integration (Google, ORCID)
+
+8. Job Status Tracking
+    - Add optional job status page with UUID
+    - Implement WebSocket or SSE for real-time updates
+    - Create progress indicators for long-running jobs
+    - Add estimated completion time
+
+9. Queue and Execution Improvements
+    - Implement job priority levels
+    - Add parallel execution support
+    - Integrate with HPC schedulers (SLURM, PBS)
+    - Add job cancellation functionality
+
+10. Enhanced MAGUS Features
+    - Add visualization of intermediate results
+    - Implement stage-level progress tracking
+    - Add ability to restart from specific stage
+    - Create comparison view for multiple runs
+
+11. Documentation and Support
+    - Create video tutorials for tool usage
+    - Add interactive tour for first-time users
+    - Implement FAQ section
+    - Add example datasets and expected outputs
+
+12. API and Integration
+    - Create REST API for programmatic access
+    - Add API authentication and rate limiting
+    - Implement webhook callbacks for job completion
+    - Create Python/R client libraries
+
+13. Analytics and Reporting
+    - Add usage statistics dashboard
+    - Track job success/failure rates
+    - Monitor execution times and resource usage
+    - Generate usage reports for funding agencies
+
+=======================
+Future Ideas
+=======================
+
+Interactive Notebook-Style MAGUS Pipeline:
+
+A compelling enhancement would be to convert the MAGUS pipeline into a Jupyter
+notebook-style interface where:
+
+    - Each pipeline stage is represented as an executable "cell"
+    - Users can run stages individually rather than the entire pipeline
+    - Intermediate data and results are visualized between stages
+    - Users can inspect, download, or modify data at any point
+    - Failed stages can be re-run without restarting from the beginning
+    - Parameters can be adjusted and stages re-executed iteratively
+
+Benefits:
+    - Enhanced interactivity and control for researchers
+    - Educational value for learning metagenomics workflows
+    - Debugging capabilities for pipeline development
+    - Flexibility to customize workflows for specific research needs
+    - Visual feedback and quality control at each step
+
+Implementation Considerations:
+    - Requires preserving intermediate outputs from each stage
+    - Need efficient storage and retrieval of intermediate data
+    - UI must support cell-based execution model
+    - Backend must track stage-level dependencies
+    - Visualization libraries needed for common data types:
+        * Sequence quality plots
+        * Assembly statistics
+        * Taxonomic composition charts
+        * Phylogenetic trees
+        * Gene abundance heatmaps
+
+Technical Approach:
+    - Could use actual Jupyter notebooks on backend
+    - Or build custom cell-based execution engine
+    - Leverage existing workflowStages components
+    - Integrate visualization libraries (Plotly, D3.js)
+    - Implement stage result caching and state management
+
+This would transform MAGUS from a "black box" pipeline into an interactive
+research platform, making it more accessible to researchers and students while
+maintaining the robustness of the current architecture.
+
+=======================
+Contributing
+=======================
+
+This project is part of academic research. Contributions, bug reports, and
+feature requests are welcome.
+
+When contributing:
+    - Follow existing code style and conventions
+    - Add tests for new functionality
+    - Update documentation for user-facing changes
+    - Ensure stub execution still works for development
+
+=======================
+License
+=======================
+
+[Add appropriate license information]
+
+=======================
+Acknowledgments
+=======================
+
+This platform was developed to support bioinformatics research and make
+advanced metagenomic analysis tools accessible to the broader scientific
+community.
+
+For questions or support, please contact: [Add contact information]
