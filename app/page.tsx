@@ -1,88 +1,43 @@
-"use client";
+/* ============================================================
+ * Landing Page — public marketing page for 2FP
+ * ============================================================
+ * This is the root route ("/"). Shows:
+ *  - Hero section with CTA
+ *  - Features overview
+ *  - Pricing tiers
+ *  - Footer
+ *
+ * The tools interface has been moved to /tools.
+ * ============================================================ */
 
-import { useState } from "react";
-import Image from "next/image";
-import XTree from "@/components/xtree";
-import MAGUS from "@/components/magus";
-import Citations from "@/components/citations";
+import Navbar from "@/components/landing/Navbar";
+import Hero from "@/components/landing/Hero";
+import Features from "@/components/landing/Features";
+import Pricing from "@/components/landing/Pricing";
+import Footer from "@/components/landing/Footer";
 
-export default function BioinformaticsTools() {
-  const [activeTab, setActiveTab] = useState<"xtree" | "magus">("xtree");
-
+export default function LandingPage() {
   return (
-    <div className="min-h-screen px-6 py-10">
-      <div className="max-w-5xl mx-auto space-y-12">
-        {/* Top Info Section */}
-        <header className="space-y-6">
-          <div className="w-full max-w-xl mx-auto">
-            <Image
-              src="/TwoFrontiersLogo.png"
-              alt="Two Frontiers Project"
-              width={1200}
-              height={300}
-              priority
-              className="object-contain"
-            />
-          </div>
+    <>
+      <Navbar />
+      <main className="min-h-screen">
+        <Hero />
 
-        </header>
+        {/* ---- divider ---- */}
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="border-t border-secondary/10" />
+        </div>
 
-        {/* Description Section */}
-        <section className="space-y-6 mx-auto max-w-4xl">
-          <h1 className="font-bold text-center text-4xl">
-            Two Frontiers Project Bioinformatics Tools
-          </h1>
+        <Features />
 
-          <p className="text-foreground leading-relaxed">
-            2FP builds open bioinformatics tools designed to scale
-            with modern sequencing data—across organisms, environments, and domains
-            of life. As reference databases grow into the millions of genomes and
-            datasets reach hundreds of millions of reads per sample, traditional
-            analysis approaches increasingly struggle with memory use, runtime,
-            and flexibility. XTree and MAGUS address different parts of this problem.
-          </p>
+        {/* ---- divider ---- */}
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="border-t border-secondary/10" />
+        </div>
 
-        </section>
-
-        {/* Tabs */}
-        <section className="space-y-4">
-          <div className="flex w-full border-b text-secondary">
-            <button
-              onClick={() => setActiveTab("xtree")}
-              className={`flex-1 px-4 py-3 text-sm text-center font-semibold transition ${
-                activeTab === "xtree"
-                  ? "border-b-4 border-accent text-accent"
-                  : "text-secondary hover:text-foreground"
-              }`}
-            >
-              XTree Interface
-            </button>
-
-            <button
-              onClick={() => setActiveTab("magus")}
-              className={`flex-1 px-4 py-3 text-sm text-center font-semibold transition ${
-                activeTab === "magus"
-                  ? "border-b-4 border-accent text-accent"
-                  : "text-secondary hover:text-foreground"
-              }`}
-            >
-              MAGUS Interface
-            </button>
-          </div>
-
-
-
-          <div className="rounded-lg border border-secondary/20 p-6 min-h-80">
-            {activeTab === "xtree" && <XTree />}
-            {activeTab === "magus" && <MAGUS />}
-          </div>
-        </section>
-
-
-        {/* Citation Section */}
-        <Citations />
-
-      </div>
-    </div>
+        <Pricing />
+      </main>
+      <Footer />
+    </>
   );
 }

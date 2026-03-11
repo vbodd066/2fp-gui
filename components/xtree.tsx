@@ -1,8 +1,21 @@
+/* ============================================================
+ * XTree — simplified direct-execution interface
+ * ============================================================
+ * Refactored per PRD §5.4:
+ *  - Email field removed (results shown in-app)
+ *  - Job queue removed (direct SSE streaming)
+ *  - Live stdout/stderr output during execution
+ *  - Downloadable output files after completion
+ *
+ * Integration point: POST /api/xtree/run (SSE stream)
+ * ============================================================ */
+
 "use client";
 
-import { useMemo, useState } from "react";
-import { HelpCircle } from "lucide-react";
-import { X } from "lucide-react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { HelpCircle, X, Download } from "lucide-react";
+import { useSSE } from "@/hooks/useSSE";
+import type { XTreeStatus } from "@/lib/types/xtree";
 
 
 type Mode = "ALIGN" | "BUILD";
@@ -14,11 +27,25 @@ export default function XTree() {
   const [seqFile, setSeqFile] = useState<File | null>(null);
   const [mapFile, setMapFile] = useState<File | null>(null);
 
-  const [email, setEmail] = useState("");
+  /* Email removed — PRD §5.2 / §7.1 */
 
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<XTreeStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  /* ---- streaming output state ---- */
+  const [stdout, setStdout] = useState("");
+  const [stderr, setStderr] = useState("");
+  const [outputFiles, setOutputFiles] = useState<string[]>([]);
+  const outputRef = useRef<HTMLPreElement>(null);
+
+  const { start, abort, isStreaming } = useSSE();
+
+  /* ---- auto-scroll output ---- */
+  useEffect(() => {
+    if (status === "running" && outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
+  }, [stdout, stderr, status]);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isDraggingSeq, setIsDraggingSeq] = useState(false);
@@ -146,75 +173,69 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
     kmer,
   ]);
 
-  /* -------------------- submit -------------------- */
-  async function submitXTree() {
-    if (!seqFile || !email) return;
+  /* -------------------- execute via SSE -------------------- */
+  function runXTree() {
+    if (!seqFile) return;
 
-    setSubmitting(true);
+    // Reset output state
+    setStatus("running");
     setError(null);
+    setStdout("");
+    setStderr("");
+    setOutputFiles([]);
 
     const params = {
       mode,
-      global: {
-        threads,
-        logOut,
-      },
+      global: { threads, logOut },
       align:
         mode === "ALIGN"
           ? {
               db,
               confidence,
-              outputs: {
-                perq: outPerq,
-                ref: outRef,
-                tax: outTax,
-                cov: outCov,
-                orthog: outOrthog,
-              },
-              algorithms: {
-                redistribute,
-                fastRedistribute,
-                shallowLca,
-              },
-              performance: {
-                copyMem,
-                doForage,
-                halfForage,
-                noAdamantium,
-              },
+              outputs: { perq: outPerq, ref: outRef, tax: outTax, cov: outCov, orthog: outOrthog },
+              algorithms: { redistribute, fastRedistribute, shallowLca },
+              performance: { copyMem, doForage, halfForage, noAdamantium },
             }
           : undefined,
       build:
         mode === "BUILD"
-          ? {
-              comp,
-              k: kmer,
-              hasMap: Boolean(mapFile),
-            }
+          ? { comp, k: kmer, hasMap: Boolean(mapFile) }
           : undefined,
     };
 
     const formData = new FormData();
     formData.append("file", seqFile);
     if (mapFile) formData.append("mapFile", mapFile);
-    formData.append("email", email);
     formData.append("params", JSON.stringify(params));
 
-    try {
-      const res = await fetch("/api/xtree", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Submission failed");
-
-      setSubmitted(true);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
+    start({
+      url: "/api/xtree/run",
+      body: formData,
+      callbacks: {
+        onEvent(event, data) {
+          switch (event) {
+            case "stdout":
+              setStdout((prev) => prev + data.line + "\n");
+              break;
+            case "stderr":
+              setStderr((prev) => prev + data.line + "\n");
+              break;
+            case "status":
+              setStatus(data.status);
+              if (data.outputFiles) setOutputFiles(data.outputFiles);
+              if (data.error) setError(data.error);
+              break;
+          }
+        },
+        onDone() {
+          if (status === "running") setStatus("success");
+        },
+        onError(err) {
+          setStatus("error");
+          setError(err.message);
+        },
+      },
+    });
   }
 
   /* -------------------- render -------------------- */
@@ -277,7 +298,7 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
               <ul className="space-y-1">
                 <li>1 • Choose between <strong>ALIGN</strong> or <strong>BUILD</strong>  modes.</li>
                 <li>2 • Upload a <strong>FASTA</strong> or <strong>FASTQ</strong> file containing your sequences.</li>
-                <li>3 • Enter your <strong>email</strong> address, and <strong>submit</strong> a job.</li>
+                <li>3 • Click <strong>Run</strong> and view results in real time.</li>
               </ul>
             </div>
           </div>
@@ -687,34 +708,80 @@ function onMapDrop(e: React.DragEvent<HTMLDivElement>) {
         {commandPreview}
       </div>
 
-      {/* email + submit */}
-      <label className="block">
-        Email
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-1 bg-transparent h-10 rounded-lg"
-        />
-      </label>
+      {/* run button */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={runXTree}
+          disabled={!seqFile || isStreaming}
+          className="bg-accent px-6 py-3 text-black rounded-lg
+                    font-semibold transition
+                    hover:brightness-95 hover:scale-[1.02]
+                    disabled:opacity-50 disabled:hover:scale-100"
+        >
+          {isStreaming ? "Running…" : status === "success" || status === "error" ? "Re-run XTree" : "Run XTree"}
+        </button>
 
-      {!submitted ? (
-        <>
+        {isStreaming && (
           <button
-            onClick={submitXTree}
-            disabled={!seqFile || !email || submitting}
-            className="bg-accent px-6 py-3 text-black rounded-lg
-                      font-semibold transition
-                      hover:brightness-95 hover:scale-[1.02]
-                      disabled:opacity-50 disabled:hover:scale-100"
+            onClick={abort}
+            className="px-4 py-3 text-sm text-red-400 border border-red-400/40
+                      rounded-lg transition hover:bg-red-400/10"
           >
-            {submitting ? "Submitting…" : "Submit XTree job"}
+            Cancel
           </button>
+        )}
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-        </>
-      ) : (
-        <p className="text-green-500">Job submitted successfully.</p>
+        {/* status indicator */}
+        {status === "success" && (
+          <span className="text-green-400 text-sm font-semibold">✓ Complete</span>
+        )}
+      </div>
+
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+
+      {/* ---- live output ---- */}
+      {(stdout || stderr) && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-secondary">
+            {status === "running" ? "Live output" : "Output"}
+          </p>
+          <pre
+            ref={outputRef}
+            className="max-h-80 overflow-y-auto bg-black/40 rounded-lg
+                       p-4 text-xs font-mono text-codeText
+                       leading-relaxed whitespace-pre-wrap break-all"
+          >
+            {stdout}
+            {stderr && (
+              <span className="text-red-400">{stderr}</span>
+            )}
+            {status === "running" && (
+              <span className="animate-pulse text-accent">▌</span>
+            )}
+          </pre>
+        </div>
+      )}
+
+      {/* ---- output files ---- */}
+      {outputFiles.length > 0 && (
+        <div className="rounded-lg border border-secondary/20 p-4 space-y-2">
+          <p className="text-sm font-semibold text-secondary">Output files</p>
+          {outputFiles.map((f) => {
+            const fileName = f.split("/").pop() || f;
+            return (
+              <a
+                key={f}
+                href={`/api/xtree/output/download?file=${encodeURIComponent(f)}`}
+                download
+                className="flex items-center gap-2 text-sm text-accent
+                           hover:text-foreground transition py-0.5"
+              >
+                <Download size={12} />
+                {fileName}
+              </a>
+            );
+          })}
+        </div>
       )}
     </div>
   );

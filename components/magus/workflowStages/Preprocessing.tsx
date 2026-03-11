@@ -1,22 +1,19 @@
-//Workflow stage Number 2
-
-
+/* ============================================================
+ * Preprocessing — config panel for Read QC & Preprocessing
+ * ============================================================
+ * Embedded inside MagusCell. No outer wrapper or enable/disable
+ * checkbox — the cell chrome is handled by MagusCell.
+ * ============================================================ */
 
 "use client";
 
 import { useEffect, useState } from "react";
 
 type Props = {
-  enabled: boolean;
-  onToggle: () => void;
   onChange: (config: any) => void;
 };
 
-export default function Preprocessing({
-  enabled,
-  onToggle,
-  onChange,
-}: Props) {
+export default function Preprocessing({ onChange }: Props) {
   /* -------------------- step toggles -------------------- */
 
   const [runQC, setRunQC] = useState<boolean>(false);
@@ -74,114 +71,80 @@ export default function Preprocessing({
   /* -------------------- render -------------------- */
 
   return (
-    <div
-      className={`border border-secondary/30 transition-all
-        ${enabled ? "p-5 space-y-6" : "p-3 space-y-2"}
-      `}
-    >
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <label
-          className="flex items-center font-bold text-md cursor-pointer
-                    transition-colors duration-150
-                    text-secondary
-                    hover:text-accent hover:scale-104"
-        >
+    <div className="space-y-6">
+      {/* step toggles */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
-            checked={enabled}
-            onChange={onToggle}
-            className="mr-2"
+            checked={runQC}
+            onChange={(e) => setRunQC(e.target.checked)}
           />
-          Read QC & Preprocessing
+          Run read QC
         </label>
 
-        <span className="text-sm text-secondary">
-          Optional
-        </span>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={runSubsample}
+            onChange={(e) => setRunSubsample(e.target.checked)}
+          />
+          Subsample reads
+        </label>
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={runFilter}
+            onChange={(e) => setRunFilter(e.target.checked)}
+          />
+          Filter reads using XTree evidence
+        </label>
       </div>
 
-      {!enabled && (
-        <p className="text-sm text-secondary">
-          Quality control, subsampling, and read filtering prior to assembly.
-        </p>
+      {/* subsampling basic */}
+      {runSubsample && (
+        <div className="space-y-3">
+          <p className="font-bold">Subsampling</p>
+
+          <label className="block">
+            Target reads per sample
+            <input
+              type="number"
+              min={1}
+              value={depth}
+              onChange={(e) => setDepth(Number(e.target.value))}
+              className="w-full border p-1 bg-transparent"
+            />
+          </label>
+        </div>
       )}
 
-      {enabled && (
-        <>
-          {/* step toggles */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={runQC}
-                onChange={(e) => setRunQC(e.target.checked)}
-              />
-              Run read QC
-            </label>
+      {/* filtering basic */}
+      {runFilter && (
+        <div className="space-y-3">
+          <p className="font-bold">Filtering</p>
 
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={runSubsample}
-                onChange={(e) => setRunSubsample(e.target.checked)}
-              />
-              Subsample reads
-            </label>
+          <label className="block">
+            Minimum k-mer evidence per read
+            <input
+              type="number"
+              min={1}
+              value={minKmers}
+              onChange={(e) => setMinKmers(Number(e.target.value))}
+              className="w-full border p-1 bg-transparent"
+            />
+          </label>
 
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={runFilter}
-                onChange={(e) => setRunFilter(e.target.checked)}
-              />
-              Filter reads using XTree evidence
-            </label>
-          </div>
+          <p className="text-sm text-secondary">
+            Requires XTree per-query (.perq) files from a prior run.
+          </p>
+        </div>
+      )}
 
-          {/* subsampling basic */}
-          {runSubsample && (
-            <div className="space-y-3">
-              <p className="font-bold">Subsampling</p>
-
-              <label className="block">
-                Target reads per sample
-                <input
-                  type="number"
-                  min={1}
-                  value={depth}
-                  onChange={(e) => setDepth(Number(e.target.value))}
-                  className="w-full border p-1 bg-transparent"
-                />
-              </label>
-            </div>
-          )}
-
-          {/* filtering basic */}
-          {runFilter && (
-            <div className="space-y-3">
-              <p className="font-bold">Filtering</p>
-
-              <label className="block">
-                Minimum k-mer evidence per read
-                <input
-                  type="number"
-                  min={1}
-                  value={minKmers}
-                  onChange={(e) => setMinKmers(Number(e.target.value))}
-                  className="w-full border p-1 bg-transparent"
-                />
-              </label>
-
-              <p className="text-sm text-secondary">
-                Requires XTree per-query (.perq) files from a prior run.
-              </p>
-            </div>
-          )}
-
-          {/* advanced toggle */}
-          {(runSubsample || runFilter) && (
-            <button
+      {/* advanced toggle */}
+      {(runSubsample || runFilter) && (
+        <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="text-sm text-accent
                     transition
@@ -190,77 +153,75 @@ export default function Preprocessing({
         >
           {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
         </button>
+      )}
+
+      {/* advanced settings */}
+      {showAdvanced && (
+        <div className="space-y-4">
+          {runSubsample && (
+            <>
+              <p className="font-bold">Subsampling (advanced)</p>
+
+              <label className="block">
+                Threads
+                <input
+                  type="number"
+                  min={1}
+                  value={subsampleThreads}
+                  onChange={(e) =>
+                    setSubsampleThreads(Number(e.target.value))
+                  }
+                  className="w-full border p-1 bg-transparent"
+                />
+              </label>
+
+              <label className="block">
+                Max parallel samples
+                <input
+                  type="number"
+                  min={1}
+                  value={subsampleWorkers}
+                  onChange={(e) =>
+                    setSubsampleWorkers(Number(e.target.value))
+                  }
+                  className="w-full border p-1 bg-transparent"
+                />
+              </label>
+            </>
           )}
 
-          {/* advanced settings */}
-          {showAdvanced && (
-            <div className="space-y-4">
-              {runSubsample && (
-                <>
-                  <p className="font-bold">Subsampling (advanced)</p>
+          {runFilter && (
+            <>
+              <p className="font-bold">Filtering (advanced)</p>
 
-                  <label className="block">
-                    Threads
-                    <input
-                      type="number"
-                      min={1}
-                      value={subsampleThreads}
-                      onChange={(e) =>
-                        setSubsampleThreads(Number(e.target.value))
-                      }
-                      className="w-full border p-1 bg-transparent"
-                    />
-                  </label>
+              <label className="block">
+                Threads
+                <input
+                  type="number"
+                  min={1}
+                  value={filterThreads}
+                  onChange={(e) =>
+                    setFilterThreads(Number(e.target.value))
+                  }
+                  className="w-full border p-1 bg-transparent"
+                />
+              </label>
 
-                  <label className="block">
-                    Max parallel samples
-                    <input
-                      type="number"
-                      min={1}
-                      value={subsampleWorkers}
-                      onChange={(e) =>
-                        setSubsampleWorkers(Number(e.target.value))
-                      }
-                      className="w-full border p-1 bg-transparent"
-                    />
-                  </label>
-                </>
-              )}
-
-              {runFilter && (
-                <>
-                  <p className="font-bold">Filtering (advanced)</p>
-
-                  <label className="block">
-                    Threads
-                    <input
-                      type="number"
-                      min={1}
-                      value={filterThreads}
-                      onChange={(e) =>
-                        setFilterThreads(Number(e.target.value))
-                      }
-                      className="w-full border p-1 bg-transparent"
-                    />
-                  </label>
-
-                  <label className="block">
-                    Max parallel samples
-                    <input
-                      type="number"
-                      min={1}
-                      value={filterWorkers}
-                      onChange={(e) =>
-                        setFilterWorkers(Number(e.target.value))
-                      }
-                      className="w-full border p-1 bg-transparent"
-                    />
-                  </label>
-                </>
-              )}
-            </div>
+              <label className="block">
+                Max parallel samples
+                <input
+                  type="number"
+                  min={1}
+                  value={filterWorkers}
+                  onChange={(e) =>
+                    setFilterWorkers(Number(e.target.value))
+                  }
+                  className="w-full border p-1 bg-transparent"
+                />
+              </label>
+            </>
           )}
-        </>
+        </div>
       )}
     </div>
   );

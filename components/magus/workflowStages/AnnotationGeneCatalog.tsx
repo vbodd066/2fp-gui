@@ -1,18 +1,19 @@
+/* ============================================================
+ * AnnotationGeneCatalog — config panel for Annotation & Gene Catalogs
+ * ============================================================
+ * Embedded inside MagusCell. No outer wrapper or enable/disable
+ * checkbox — the cell chrome is handled by MagusCell.
+ * ============================================================ */
+
 "use client";
 
 import { useEffect, useState } from "react";
 
 type Props = {
-  enabled: boolean;
-  onToggle: () => void;
   onChange: (config: any) => void;
 };
 
-export default function AnnotationGeneCatalog({
-  enabled,
-  onToggle,
-  onChange,
-}: Props) {
+export default function AnnotationGeneCatalog({ onChange }: Props) {
   /* -------------------- ORF calling -------------------- */
 
   const [callOrfs, setCallOrfs] = useState<boolean>(true);
@@ -98,201 +99,166 @@ export default function AnnotationGeneCatalog({
   /* -------------------- render -------------------- */
 
   return (
-    <div
-      className={`border border-secondary/30 transition-all
-        ${enabled ? "p-5 space-y-6" : "p-3 space-y-2"}
-      `}
-    >
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <label
-          className="flex items-center font-bold text-md cursor-pointer
-                    text-secondary
-                    transition-colors duration-150
-                    hover:text-accent"
-        >
+    <div className="space-y-6">
+      {/* ORF calling */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 font-bold">
           <input
             type="checkbox"
-            checked={enabled}
-            onChange={onToggle}
-            className="mr-2"
+            checked={callOrfs}
+            onChange={(e) =>
+              setCallOrfs(e.target.checked)
+            }
           />
-          Annotation & gene catalogs
+          Call ORFs
         </label>
 
-        <span className="text-sm text-secondary">
-          Optional
-        </span>
+        {callOrfs && (
+          <label className="block">
+            Domain
+            <select
+              value={domain}
+              onChange={(e) =>
+                setDomain(
+                  e.target.value as any
+                )
+              }
+              className="w-full border p-1 bg-transparent"
+            >
+              <option value="bacterial">
+                Bacterial
+              </option>
+              <option value="viral">
+                Viral
+              </option>
+              <option value="eukaryotic">
+                Eukaryotic
+              </option>
+              <option value="metagenomic">
+                Metagenomic
+              </option>
+            </select>
+          </label>
+        )}
       </div>
 
-      {!enabled && (
-        <p className="text-sm text-secondary">
-          Predict ORFs, annotate proteins, and optionally build a
-          gene catalog.
-        </p>
-      )}
+      {/* annotation */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 font-bold">
+          <input
+            type="checkbox"
+            checked={annotate}
+            onChange={(e) =>
+              setAnnotate(e.target.checked)
+            }
+          />
+          Annotate proteins
+        </label>
 
-      {enabled && (
-        <>
-          {/* ORF calling */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 font-bold">
-              <input
-                type="checkbox"
-                checked={callOrfs}
+        {annotate && (
+          <>
+            <label className="block">
+              Domains to annotate
+              <select
+                multiple
+                value={domains}
                 onChange={(e) =>
-                  setCallOrfs(e.target.checked)
+                  setDomains(
+                    Array.from(
+                      e.target.selectedOptions
+                    ).map((o) => o.value)
+                  )
                 }
-              />
-              Call ORFs
+                className="w-full border p-1 bg-transparent"
+              >
+                <option value="bacteria">
+                  Bacteria
+                </option>
+                <option value="viruses">
+                  Viruses
+                </option>
+                <option value="metagenomes">
+                  Metagenomes
+                </option>
+                <option value="eukaryotes">
+                  Eukaryotes
+                </option>
+              </select>
             </label>
 
-            {callOrfs && (
-              <label className="block">
-                Domain
-                <select
-                  value={domain}
-                  onChange={(e) =>
-                    setDomain(
-                      e.target.value as any
-                    )
-                  }
-                  className="w-full border p-1 bg-transparent"
-                >
-                  <option value="bacterial">
-                    Bacterial
-                  </option>
-                  <option value="viral">
-                    Viral
-                  </option>
-                  <option value="eukaryotic">
-                    Eukaryotic
-                  </option>
-                  <option value="metagenomic">
-                    Metagenomic
-                  </option>
-                </select>
-              </label>
-            )}
-          </div>
-
-          {/* annotation */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 font-bold">
+            <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={annotate}
+                checked={useCustomHmm}
                 onChange={(e) =>
-                  setAnnotate(e.target.checked)
-                }
-              />
-              Annotate proteins
-            </label>
-
-            {annotate && (
-              <>
-                <label className="block">
-                  Domains to annotate
-                  <select
-                    multiple
-                    value={domains}
-                    onChange={(e) =>
-                      setDomains(
-                        Array.from(
-                          e.target.selectedOptions
-                        ).map((o) => o.value)
-                      )
-                    }
-                    className="w-full border p-1 bg-transparent"
-                  >
-                    <option value="bacteria">
-                      Bacteria
-                    </option>
-                    <option value="viruses">
-                      Viruses
-                    </option>
-                    <option value="metagenomes">
-                      Metagenomes
-                    </option>
-                    <option value="eukaryotes">
-                      Eukaryotes
-                    </option>
-                  </select>
-                </label>
-
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={useCustomHmm}
-                    onChange={(e) =>
-                      setUseCustomHmm(
-                        e.target.checked
-                      )
-                    }
-                  />
-                  Use custom HMM database
-                </label>
-              </>
-            )}
-          </div>
-
-          {/* gene catalog */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 font-bold">
-              <input
-                type="checkbox"
-                checked={buildCatalog}
-                onChange={(e) =>
-                  setBuildCatalog(
+                  setUseCustomHmm(
                     e.target.checked
                   )
                 }
               />
-              Build gene catalog
+              Use custom HMM database
+            </label>
+          </>
+        )}
+      </div>
+
+      {/* gene catalog */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 font-bold">
+          <input
+            type="checkbox"
+            checked={buildCatalog}
+            onChange={(e) =>
+              setBuildCatalog(
+                e.target.checked
+              )
+            }
+          />
+          Build gene catalog
+        </label>
+
+        {buildCatalog && (
+          <>
+            <label className="block">
+              Identity threshold
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                max={1}
+                value={identityThreshold}
+                onChange={(e) =>
+                  setIdentityThreshold(
+                    Number(e.target.value)
+                  )
+                }
+                className="w-full border p-1 bg-transparent"
+              />
             </label>
 
-            {buildCatalog && (
-              <>
-                <label className="block">
-                  Identity threshold
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    max={1}
-                    value={identityThreshold}
-                    onChange={(e) =>
-                      setIdentityThreshold(
-                        Number(e.target.value)
-                      )
-                    }
-                    className="w-full border p-1 bg-transparent"
-                  />
-                </label>
+            <label className="block">
+              Coverage threshold
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                max={1}
+                value={coverageThreshold}
+                onChange={(e) =>
+                  setCoverageThreshold(
+                    Number(e.target.value)
+                  )
+                }
+                className="w-full border p-1 bg-transparent"
+              />
+            </label>
+          </>
+        )}
+      </div>
 
-                <label className="block">
-                  Coverage threshold
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    max={1}
-                    value={coverageThreshold}
-                    onChange={(e) =>
-                      setCoverageThreshold(
-                        Number(e.target.value)
-                      )
-                    }
-                    className="w-full border p-1 bg-transparent"
-                  />
-                </label>
-              </>
-            )}
-          </div>
-
-          {/* advanced toggle */}
-          {(annotate || buildCatalog) && (
-            <button
+      {/* advanced toggle */}
+      {(annotate || buildCatalog) && (
+        <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="text-sm text-accent
                     transition
@@ -301,61 +267,25 @@ export default function AnnotationGeneCatalog({
         >
           {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
         </button>
-          )}
+      )}
 
-          {/* advanced */}
-          {showAdvanced && (
-            <div className="space-y-4">
-              {useCustomHmm && (
-                <>
-                  <p className="font-bold">
-                    Custom HMM thresholds
-                  </p>
-
-                  <label className="block">
-                    Full sequence e-value
-                    <input
-                      type="number"
-                      step="1e-6"
-                      value={evalueFull}
-                      onChange={(e) =>
-                        setEvalueFull(
-                          Number(e.target.value)
-                        )
-                      }
-                      className="w-full border p-1 bg-transparent"
-                    />
-                  </label>
-
-                  <label className="block">
-                    Domain e-value
-                    <input
-                      type="number"
-                      step="1e-6"
-                      value={evalueDom}
-                      onChange={(e) =>
-                        setEvalueDom(
-                          Number(e.target.value)
-                        )
-                      }
-                      className="w-full border p-1 bg-transparent"
-                    />
-                  </label>
-                </>
-              )}
-
+      {/* advanced */}
+      {showAdvanced && (
+        <div className="space-y-4">
+          {useCustomHmm && (
+            <>
               <p className="font-bold">
-                Resource limits
+                Custom HMM thresholds
               </p>
 
               <label className="block">
-                Threads
+                Full sequence e-value
                 <input
                   type="number"
-                  min={1}
-                  value={threads}
+                  step="1e-6"
+                  value={evalueFull}
                   onChange={(e) =>
-                    setThreads(
+                    setEvalueFull(
                       Number(e.target.value)
                     )
                   }
@@ -364,22 +294,56 @@ export default function AnnotationGeneCatalog({
               </label>
 
               <label className="block">
-                Max parallel jobs
+                Domain e-value
                 <input
                   type="number"
-                  min={1}
-                  value={maxWorkers}
+                  step="1e-6"
+                  value={evalueDom}
                   onChange={(e) =>
-                    setMaxWorkers(
+                    setEvalueDom(
                       Number(e.target.value)
                     )
                   }
                   className="w-full border p-1 bg-transparent"
                 />
               </label>
-            </div>
+            </>
           )}
-        </>
+
+          <p className="font-bold">
+            Resource limits
+          </p>
+
+          <label className="block">
+            Threads
+            <input
+              type="number"
+              min={1}
+              value={threads}
+              onChange={(e) =>
+                setThreads(
+                  Number(e.target.value)
+                )
+              }
+              className="w-full border p-1 bg-transparent"
+            />
+          </label>
+
+          <label className="block">
+            Max parallel jobs
+            <input
+              type="number"
+              min={1}
+              value={maxWorkers}
+              onChange={(e) =>
+                setMaxWorkers(
+                  Number(e.target.value)
+                )
+              }
+              className="w-full border p-1 bg-transparent"
+            />
+          </label>
+        </div>
       )}
     </div>
   );

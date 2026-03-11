@@ -1,18 +1,19 @@
+/* ============================================================
+ * TaxonomyFiltering — config panel for Taxonomy & Filtering
+ * ============================================================
+ * Embedded inside MagusCell. No outer wrapper or enable/disable
+ * checkbox — the cell chrome is handled by MagusCell.
+ * ============================================================ */
+
 "use client";
 
 import { useEffect, useState } from "react";
 
 type Props = {
-  enabled: boolean;
-  onToggle: () => void;
   onChange: (config: any) => void;
 };
 
-export default function TaxonomyFiltering({
-  enabled,
-  onToggle,
-  onChange,
-}: Props) {
+export default function TaxonomyFiltering({ onChange }: Props) {
   /* -------------------- taxonomy -------------------- */
 
   const [runTaxonomy, setRunTaxonomy] = useState<boolean>(true);
@@ -76,133 +77,96 @@ export default function TaxonomyFiltering({
   /* -------------------- render -------------------- */
 
   return (
-    <div
-      className={`border border-secondary/30 transition-all
-        ${enabled ? "p-5 space-y-6" : "p-3 space-y-2"}
-      `}
-    >
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <label
-          className="flex items-center font-bold text-md cursor-pointer
-                    transition-colors duration-150
-                    text-secondary
-                    hover:text-accent hover:scale-104"
-        >
+    <div className="space-y-6">
+      {/* taxonomy */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 font-bold">
           <input
             type="checkbox"
-            checked={enabled}
-            onChange={onToggle}
-            className="mr-2"
+            checked={runTaxonomy}
+            onChange={(e) =>
+              setRunTaxonomy(e.target.checked)
+            }
           />
-          Taxonomy & Filtering
+          Run taxonomy
         </label>
 
-        <span className="text-sm text-secondary">
-          Optional
-        </span>
+        {runTaxonomy && (
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              XTree database
+              <select
+                value={db}
+                onChange={(e) =>
+                  setDb(e.target.value as any)
+                }
+                className="w-full border p-1 bg-transparent h-8"
+              >
+                <option value="gtdb">GTDB</option>
+                <option value="refseq">RefSeq</option>
+              </select>
+            </label>
+
+            <label className="block">
+              Coverage cutoff
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                max={1}
+                value={coverageCutoff}
+                onChange={(e) =>
+                  setCoverageCutoff(
+                    Number(e.target.value)
+                  )
+                }
+                className="w-full border p-1 bg-transparent rounded-lg"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
-      {!enabled && (
-        <p className="text-sm text-secondary">
-          Classify contigs and MAGs using XTree and apply evidence-based
-          filtering.
-        </p>
-      )}
+      {/* filtering */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 font-bold">
+          <input
+            type="checkbox"
+            checked={runFiltering}
+            onChange={(e) =>
+              setRunFiltering(e.target.checked)
+            }
+          />
+          Filter MAGs using XTree evidence
+        </label>
 
-      {enabled && (
-        <>
-          {/* taxonomy */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 font-bold">
+        {runFiltering && (
+          <>
+            <label className="block">
+              Minimum k-mer evidence per contig
               <input
-                type="checkbox"
-                checked={runTaxonomy}
+                type="number"
+                min={1}
+                value={kmerThreshold}
                 onChange={(e) =>
-                  setRunTaxonomy(e.target.checked)
+                  setKmerThreshold(
+                    Number(e.target.value)
+                  )
                 }
+                className="w-full border p-1 bg-transparent rounded-lg"
               />
-              Run taxonomy
             </label>
 
-            {runTaxonomy && (
-              <>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  XTree database
-                  <select
-                    value={db}
-                    onChange={(e) =>
-                      setDb(e.target.value as any)
-                    }
-                    className="w-full border p-1 bg-transparent h-8"
-                  >
-                    <option value="gtdb">GTDB</option>
-                    <option value="refseq">RefSeq</option>
-                  </select>
-                </label>
+            <p className="text-sm text-secondary">
+              Requires per-query (.perq) files generated by XTree.
+            </p>
+          </>
+        )}
+      </div>
 
-                <label className="block">
-                  Coverage cutoff
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    max={1}
-                    value={coverageCutoff}
-                    onChange={(e) =>
-                      setCoverageCutoff(
-                        Number(e.target.value)
-                      )
-                    }
-                    className="w-full border p-1 bg-transparent rounded-lg"
-                  />
-                  </label>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* filtering */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 font-bold">
-              <input
-                type="checkbox"
-                checked={runFiltering}
-                onChange={(e) =>
-                  setRunFiltering(e.target.checked)
-                }
-              />
-              Filter MAGs using XTree evidence
-            </label>
-
-            {runFiltering && (
-              <>
-                <label className="block">
-                  Minimum k-mer evidence per contig
-                  <input
-                    type="number"
-                    min={1}
-                    value={kmerThreshold}
-                    onChange={(e) =>
-                      setKmerThreshold(
-                        Number(e.target.value)
-                      )
-                    }
-                    className="w-full border p-1 bg-transparent rounded-lg"
-                  />
-                </label>
-
-                <p className="text-sm text-secondary">
-                  Requires per-query (.perq) files generated by XTree.
-                </p>
-              </>
-            )}
-          </div>
-
-          {/* advanced toggle */}
-          {(runTaxonomy || runFiltering) && (
-            <button
+      {/* advanced toggle */}
+      {(runTaxonomy || runFiltering) && (
+        <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="text-sm text-accent
                     transition
@@ -211,98 +175,96 @@ export default function TaxonomyFiltering({
         >
           {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
         </button>
-          )}
+      )}
 
-          {/* advanced */}
-          {showAdvanced && (
-            <div className="space-y-4">
-              {runTaxonomy && (
-                <>
-                  <p className="font-bold">
-                    Taxonomy outputs
-                  </p>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={skipPerq}
-                        onChange={(e) =>
-                          setSkipPerq(
-                            e.target.checked
-                          )
-                        }
-                      />
-                      Skip per-query output
-                    </label>
-
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={skipCov}
-                        onChange={(e) =>
-                          setSkipCov(
-                            e.target.checked
-                          )
-                        }
-                      />
-                      Skip coverage output
-                    </label>
-
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={skipRef}
-                        onChange={(e) =>
-                          setSkipRef(
-                            e.target.checked
-                          )
-                        }
-                      />
-                      Skip reference output
-                    </label>
-                  </div>
-                </>
-              )}
-
+      {/* advanced */}
+      {showAdvanced && (
+        <div className="space-y-4">
+          {runTaxonomy && (
+            <>
               <p className="font-bold">
-                Resource limits
+                Taxonomy outputs
               </p>
 
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  Threads per XTree run
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <label className="flex items-center gap-2">
                   <input
-                    type="number"
-                    min={1}
-                    value={threads}
+                    type="checkbox"
+                    checked={skipPerq}
                     onChange={(e) =>
-                      setThreads(
-                        Number(e.target.value)
+                      setSkipPerq(
+                        e.target.checked
                       )
                     }
-                    className="w-full border p-1 bg-transparent rounded-lg"
                   />
+                  Skip per-query output
                 </label>
 
-                <label className="block">
-                  Max parallel samples
+                <label className="flex items-center gap-2">
                   <input
-                    type="number"
-                    min={1}
-                    value={maxWorkers}
+                    type="checkbox"
+                    checked={skipCov}
                     onChange={(e) =>
-                      setMaxWorkers(
-                        Number(e.target.value)
+                      setSkipCov(
+                        e.target.checked
                       )
                     }
-                    className="w-full border p-1 bg-transparent rounded-lg"
                   />
+                  Skip coverage output
+                </label>
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={skipRef}
+                    onChange={(e) =>
+                      setSkipRef(
+                        e.target.checked
+                      )
+                    }
+                  />
+                  Skip reference output
                 </label>
               </div>
-            </div>
+            </>
           )}
-        </>
+
+          <p className="font-bold">
+            Resource limits
+          </p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              Threads per XTree run
+              <input
+                type="number"
+                min={1}
+                value={threads}
+                onChange={(e) =>
+                  setThreads(
+                    Number(e.target.value)
+                  )
+                }
+                className="w-full border p-1 bg-transparent rounded-lg"
+              />
+            </label>
+
+            <label className="block">
+              Max parallel samples
+              <input
+                type="number"
+                min={1}
+                value={maxWorkers}
+                onChange={(e) =>
+                  setMaxWorkers(
+                    Number(e.target.value)
+                  )
+                }
+                className="w-full border p-1 bg-transparent rounded-lg"
+              />
+            </label>
+          </div>
+        </div>
       )}
     </div>
   );

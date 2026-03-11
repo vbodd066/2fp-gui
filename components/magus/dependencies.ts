@@ -2,9 +2,10 @@
  * MAGUS workflow dependency engine
  * ============================================================
  * Centralized logic for:
- *  - cross-stage dependencies
- *  - auto-disabling invalid stages
- *  - dependency warnings
+ *  - cross-stage dependency warnings (advisory, non-blocking)
+ *  - dependency graph declaration
+ *
+ * PRD §6.8 — Dependencies produce warnings, never auto-disable.
  * ============================================================
  */
 
@@ -87,7 +88,7 @@ export const STAGE_DEPENDENCY_RULES: DependencyRule[] = [
 ];
 
 /* ============================================================
- * Dependency evaluation (warnings only)
+ * Dependency evaluation (warnings only — PRD §6.8)
  * ============================================================
  */
 
@@ -112,54 +113,6 @@ export function evaluateStageDependencies(
   }
 
   return warnings;
-}
-
-/* ============================================================
- * Auto-disable invalid stages
- * ============================================================
- */
-
-/**
- * Enforce dependencies by auto-disabling stages whose
- * requirements are not satisfied.
- *
- * This function:
- *  - never mutates the input
- *  - cascades (disabling assembly disables taxonomy, etc.)
- *  - is deterministic
- */
-export function enforceStageDependencies(
-  stages: WorkflowState
-): WorkflowState {
-  // Deep-ish clone (config objects are preserved)
-  let next: WorkflowState = structuredClone(stages);
-
-  let changed = true;
-
-  // Iterate until no more stages are auto-disabled
-  while (changed) {
-    changed = false;
-
-    for (const rule of STAGE_DEPENDENCY_RULES) {
-      const stage = rule.stage;
-
-      if (!next[stage]?.enabled) continue;
-
-      const missing = rule.requires.filter(
-        (req) => !next[req]?.enabled
-      );
-
-      if (missing.length > 0) {
-        next[stage] = {
-          ...next[stage],
-          enabled: false,
-        };
-        changed = true;
-      }
-    }
-  }
-
-  return next;
 }
 
 /* ============================================================

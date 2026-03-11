@@ -21,6 +21,9 @@ scripts/xtree/2FP-XTree/
 tmp/
 jobs/
 
+# database
+/data/
+
 # next.js
 /.next/
 /out/

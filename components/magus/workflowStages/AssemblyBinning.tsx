@@ -1,21 +1,19 @@
-//Workflow stage Number 3
-
+/* ============================================================
+ * AssemblyBinning — config panel for Assembly & Binning
+ * ============================================================
+ * Embedded inside MagusCell. No outer wrapper or enable/disable
+ * checkbox — the cell chrome is handled by MagusCell.
+ * ============================================================ */
 
 "use client";
 
 import { useEffect, useState } from "react";
 
 type Props = {
-  enabled: boolean;
-  onToggle: () => void;
   onChange: (config: any) => void;
 };
 
-export default function AssemblyBinning({
-  enabled,
-  onToggle,
-  onChange,
-}: Props) {
+export default function AssemblyBinning({ onChange }: Props) {
   /* -------------------- assembly strategy -------------------- */
 
   const [strategy, setStrategy] =
@@ -95,226 +93,195 @@ export default function AssemblyBinning({
   /* -------------------- render -------------------- */
 
   return (
-    <div className="border border-secondary/30 p-5 space-y-6">
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <label
-          className="flex items-center font-bold text-md cursor-pointer
-                    transition-colors duration-150
-                    hover:text-accent hover:scale-104"
-        >
+    <div className="space-y-6">
+      {/* assembly strategy */}
+      <div className="space-y-3">
+        <p className="font-bold">Assembly strategy</p>
+
+        <label className="flex items-center gap-2">
           <input
-            type="checkbox"
-            checked={enabled}
-            onChange={onToggle}
-            className="mr-2"
+            type="radio"
+            name="assembly"
+            checked={strategy === "single"}
+            onChange={() => setStrategy("single")}
           />
-          Assembly & Binning
+          Single-sample assembly
         </label>
 
-        <span className="text-sm text-secondary">
-          Required - Core stage
-        </span>
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            name="assembly"
+            checked={strategy === "coassembly"}
+            onChange={() => setStrategy("coassembly")}
+          />
+          Co-assembly across samples
+        </label>
       </div>
 
-      {!enabled && (
-        <p className="text-sm text-secondary">
-          Generate assemblies and recover MAGs.
-        </p>
-      )}
+      {/* binning */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 font-bold">
+          <input
+            type="checkbox"
+            checked={enableBinning}
+            onChange={(e) =>
+              setEnableBinning(e.target.checked)
+            }
+          />
+          Enable binning
+        </label>
 
-      {enabled && (
-        <>
-          {/* assembly strategy */}
-          <div className="space-y-3">
-            <p className="font-bold">Assembly strategy</p>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="assembly"
-                checked={strategy === "single"}
-                onChange={() => setStrategy("single")}
-              />
-              Single-sample assembly
+        {enableBinning && (
+          <>
+            <label className="block">
+              Quality preset
+              <select
+                value={qualityPreset}
+                onChange={(e) =>
+                  setQualityPreset(
+                    e.target.value as any
+                  )
+                }
+                className="w-full border p-1 h-8 bg-transparent"
+              >
+                <option value="low">
+                  Low quality (exploratory)
+                </option>
+                <option value="medium">
+                  Medium quality (default)
+                </option>
+                <option value="high">
+                  High quality (stringent)
+                </option>
+                <option value="custom">
+                  Custom thresholds
+                </option>
+              </select>
             </label>
 
-            <label className="flex items-center gap-2">
+            {qualityPreset === "custom" && (
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block">
+                  Completeness ≥ (%)
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={completeness}
+                    onChange={(e) =>
+                      setCompleteness(
+                        Number(e.target.value)
+                      )
+                    }
+                    className="w-full border p-1 bg-transparent"
+                  />
+                </label>
+
+                <label className="block">
+                  Contamination ≤ (%)
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={contamination}
+                    onChange={(e) =>
+                      setContamination(
+                        Number(e.target.value)
+                      )
+                    }
+                    className="w-full border p-1 bg-transparent"
+                  />
+                </label>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* advanced toggle */}
+      <button
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="text-sm text-accent
+                  transition
+                  hover:text-foreground hover:scale-[1.03]
+                  active:scale-[0.98]"
+      >
+        {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
+      </button>
+
+      {/* advanced settings */}
+      {showAdvanced && (
+        <div className="space-y-4">
+          <p className="font-bold">Resources</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              Threads per assembly
               <input
-                type="radio"
-                name="assembly"
-                checked={strategy === "coassembly"}
-                onChange={() => setStrategy("coassembly")}
+                type="number"
+                min={1}
+                value={threads}
+                onChange={(e) =>
+                  setThreads(Number(e.target.value))
+                }
+                className="w-full border p-1 bg-transparent rounded-lg"
               />
-              Co-assembly across samples
+            </label>
+
+            <label className="block">
+              Max parallel samples
+              <input
+                type="number"
+                min={1}
+                value={maxWorkers}
+                onChange={(e) =>
+                  setMaxWorkers(Number(e.target.value))
+                }
+                className="w-full border p-1 bg-transparent rounded-lg"
+              />
             </label>
           </div>
 
-          {/* binning */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 font-bold">
+          <p className="font-bold">Execution control</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              Restart from stage
+              <select
+                value={restartStage}
+                onChange={(e) =>
+                  setRestartStage(
+                    e.target.value as any
+                  )
+                }
+                className="w-full border p-1 bg-transparent h-8"
+              >
+                <option value="none">None</option>
+                <option value="binning">
+                  Binning
+                </option>
+                <option value="checkm">
+                  CheckM
+                </option>
+                <option value="filtering">
+                  Filtering
+                </option>
+              </select>
+            </label>
+
+            <label className="flex items-center mt-5 gap-2">
               <input
                 type="checkbox"
-                checked={enableBinning}
+                checked={testMode}
                 onChange={(e) =>
-                  setEnableBinning(e.target.checked)
+                  setTestMode(e.target.checked)
                 }
               />
-              Enable binning
+              Test mode (relaxed filters, fallback bins)
             </label>
-
-            {enableBinning && (
-              <>
-                <label className="block">
-                  Quality preset
-                  <select
-                    value={qualityPreset}
-                    onChange={(e) =>
-                      setQualityPreset(
-                        e.target.value as any
-                      )
-                    }
-                    className="w-full border p-1 h-8 bg-transparent"
-                  >
-                    <option value="low">
-                      Low quality (exploratory)
-                    </option>
-                    <option value="medium">
-                      Medium quality (default)
-                    </option>
-                    <option value="high">
-                      High quality (stringent)
-                    </option>
-                    <option value="custom">
-                      Custom thresholds
-                    </option>
-                  </select>
-                </label>
-
-                {qualityPreset === "custom" && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className="block">
-                      Completeness ≥ (%)
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={completeness}
-                        onChange={(e) =>
-                          setCompleteness(
-                            Number(e.target.value)
-                          )
-                        }
-                        className="w-full border p-1 bg-transparent"
-                      />
-                    </label>
-
-                    <label className="block">
-                      Contamination ≤ (%)
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={contamination}
-                        onChange={(e) =>
-                          setContamination(
-                            Number(e.target.value)
-                          )
-                        }
-                        className="w-full border p-1 bg-transparent"
-                      />
-                    </label>
-                  </div>
-                )}
-              </>
-            )}
           </div>
-
-          {/* advanced toggle */}
-          <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-sm text-accent
-                    transition
-                    hover:text-foreground hover:scale-[1.03]
-                    active:scale-[0.98]"
-        >
-          {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
-        </button>
-
-          {/* advanced settings */}
-          {showAdvanced && (
-            <div className="space-y-4">
-              <p className="font-bold">Resources</p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  Threads per assembly
-                  <input
-                    type="number"
-                    min={1}
-                    value={threads}
-                    onChange={(e) =>
-                      setThreads(Number(e.target.value))
-                    }
-                    className="w-full border p-1 bg-transparent rounded-lg"
-                  />
-                </label>
-
-                <label className="block">
-                  Max parallel samples
-                  <input
-                    type="number"
-                    min={1}
-                    value={maxWorkers}
-                    onChange={(e) =>
-                      setMaxWorkers(Number(e.target.value))
-                    }
-                    className="w-full border p-1 bg-transparent rounded-lg"
-                  />
-                </label>
-              </div>
-
-              <p className="font-bold">Execution control</p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  Restart from stage
-                  <select
-                    value={restartStage}
-                    onChange={(e) =>
-                      setRestartStage(
-                        e.target.value as any
-                      )
-                    }
-                    className="w-full border p-1 bg-transparent h-8"
-                  >
-                    <option value="none">None</option>
-                    <option value="binning">
-                      Binning
-                    </option>
-                    <option value="checkm">
-                      CheckM
-                    </option>
-                    <option value="filtering">
-                      Filtering
-                    </option>
-                  </select>
-                </label>
-
-                <label className="flex items-center mt-5 gap-2">
-                  <input
-                    type="checkbox"
-                    checked={testMode}
-                    onChange={(e) =>
-                      setTestMode(e.target.checked)
-                    }
-                  />
-                  Test mode (relaxed filters, fallback bins)
-                </label>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   );
